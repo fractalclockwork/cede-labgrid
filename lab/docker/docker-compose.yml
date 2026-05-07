@@ -1,0 +1,39 @@
+name: cede
+
+services:
+  pico-dev:
+    build:
+      context: ./pico-dev
+      dockerfile: Dockerfile
+    image: cede/pico-dev:local
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  arduino-dev:
+    build:
+      context: ./arduino-dev
+      dockerfile: Dockerfile
+    image: cede/arduino-dev:local
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  orchestration-dev:
+    build:
+      context: ./orchestration-dev
+      dockerfile: Dockerfile
+    image: cede/orchestration-dev:local
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  # Privileged SD / loop device access at runtime: docker compose run --rm --privileged ...
+  rpi-imager-dev:
+    build:
+      context: ./rpi-imager
+      dockerfile: Dockerfile
+    image: cede/rpi-imager-dev:local
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace

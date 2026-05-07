@@ -1,0 +1,18 @@
+# Manual matrix: native host + emulated linux/arm64 + linux/amd64 compose builds (slow / heavy).
+name: Docker target workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  docker-targets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: QEMU binfmt (amd64 host → arm64 Dockerfile RUN steps)
+        run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all
+
+      - name: Host → emulated arm64/amd64 → restore host
+        run: make docker-workflow

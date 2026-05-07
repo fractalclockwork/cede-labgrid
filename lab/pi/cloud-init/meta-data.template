@@ -1,0 +1,2 @@
+instance-id: cede-pi-bootstrap-001
+local-hostname: @@HOSTNAME@@

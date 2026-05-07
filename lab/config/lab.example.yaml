@@ -1,0 +1,93 @@
+# Copy to lab/config/lab.yaml (gitignored) or set CEDE_LAB_CONFIG.
+# Paths below are relative to the repository root unless absolute.
+
+schema_version: 1
+
+hosts:
+  dev_host:
+    role: dev-host
+    repo_root: "~/src/cede"
+  pi:
+    role: raspberry-pi-gateway
+    ssh_host: cede-pi.local
+    ssh_user: pi
+    repo_root: "~/cede"
+
+serial:
+  defaults:
+    baud: 115200
+    newline: "\n"
+    timeout_s: 2.0
+  devices:
+    pico:
+      by_id_glob: "/dev/serial/by-id/usb-Raspberry_Pi_*"
+      fallback_globs:
+        - "/dev/ttyACM*"
+    uno:
+      by_id_glob: "/dev/serial/by-id/usb-Arduino_*"
+      fallback_globs:
+        - "/dev/ttyUSB*"
+        - "/dev/ttyACM*"
+
+paths:
+  pico_build: "lab/pico/hello_lab/build"
+  pico_uf2_glob: "lab/pico/hello_lab/build/*.uf2"
+  uno_build: "lab/uno/hello_lab/build"
+  uno_hex_glob: "lab/uno/hello_lab/build/*.hex"
+  logs_dir: "lab/pi/logs"
+  test_results_dir: "lab/tests/results"
+
+# Hello Lab Test 7 — only enabled pairs are exercised; n/a pairs must declare reason.
+i2c_matrix:
+  bus_hz: 100000
+  probe_address: 0x42
+  pairs:
+    - initiator: rpi
+      target: pico
+      status: enabled
+      linux_bus: 1
+      notes: "Pi as controller; Pico target firmware must ACK probe."
+
+    - initiator: rpi
+      target: uno
+      status: n/a
+      reason: "Requires level shifting / wiring not populated on bench v0."
+
+    - initiator: pico
+      target: uno
+      status: n/a
+      reason: "Inter-MCU I2C needs shared bus + translation; document before enabling."
+
+    - initiator: uno
+      target: pico
+      status: n/a
+      reason: "Same as pico→uno; enable only when electrically verified."
+
+metrics:
+  enabled: false
+  prefix: "cede_lab"
+
+# Optional: drive SD imaging / cloud-init from this file (see lab/pi/docs/sdcard.md).
+# Pi 3 B gateway + Ethernet DHCP + SSH: lab/pi/docs/rpi3-gateway-remote.md
+# Build artifact, transfer, dd flash: lab/pi/docs/pi-gateway-image-transfer-flash.md
+# hosts.pi.ssh_host should be "<hostname>.local" when using mDNS (not an IP).
+raspberry_pi_bootstrap:
+  hostname: cede-pi
+  # Headless SSH: uncomment and set path to your Dev-Host PUBLIC key (.pub). Required if you did not
+  # create the OS user/password via Raspberry Pi Imager or keyboard. See lab/pi/docs/ssh-keys-bootstrap.md
+  # The rendered user-data adds Pi-style groups (including sudo) and NOPASSWD sudo for that user.
+  authorized_keys_file: "~/.ssh/id_ed25519.pub"
+  timezone: UTC
+  locale: en_US.UTF-8
+  os_image:
+    # Raspberry Pi OS Lite (64-bit), Debian Trixie — boot-partition cloud-init (hostname, SSH, keys).
+    # Bookworm lite images ignore these files; you will keep hostname raspberrypi and no headless SSH.
+    # Pin url + sha256 from https://www.raspberrypi.com/software/operating-systems/
+    url: "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-04-21/2026-04-21-raspios-trixie-arm64-lite.img.xz"
+    sha256: "4cd31df026fd82243805a326dc0cafd7383f7e3d30c9413e7044d507aae281e2"
+    # Distinct name avoids reusing an older Bookworm .xz left in lab/pi/dist/ at the previous path.
+    cache_path: "lab/pi/dist/raspios_trixie_arm64_latest.img.xz"
+  # wifi:
+  #   ssid: "my-network"
+  #   regulatory_domain: "US"
+  #   psk_file: "~/secrets/home-wifi.psk"

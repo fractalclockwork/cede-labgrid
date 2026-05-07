@@ -1,0 +1,5 @@
+# Post–Hello Lab: physical sensors, buses, and driver references.
+# Populated after §9 bring-up; leave empty or commented until hardware is fixed.
+
+schema_version: 1
+sensors: []

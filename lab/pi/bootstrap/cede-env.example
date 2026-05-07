@@ -1,0 +1,4 @@
+# Copy to cede-env on the Pi (not committed) and: set -a && source ./cede-env && sudo -E ./bootstrap_pi.sh
+
+CEDE_HOSTNAME="cede-gateway"
+# CEDE_GATEWAY_USER="pi"

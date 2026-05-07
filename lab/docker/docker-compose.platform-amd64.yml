@@ -1,0 +1,12 @@
+# Merge: docker compose -f docker-compose.yml -f docker-compose.platform-amd64.yml build
+# Forces linux/amd64 for all Dev-Host images (cross-build when host is arm64).
+name: cede
+services:
+  pico-dev:
+    platform: linux/amd64
+  arduino-dev:
+    platform: linux/amd64
+  orchestration-dev:
+    platform: linux/amd64
+  rpi-imager-dev:
+    platform: linux/amd64

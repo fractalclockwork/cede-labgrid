@@ -1,0 +1,44 @@
+#cloud-config
+# Raspberry Pi OS Lite (Debian Trixie+): ship user-data, meta-data, and network-config on the
+# FAT boot partition (see lab/pi/bootstrap/cloud_init_render.py). Bookworm-era images do not
+# run this cloud-init path — use a Trixie (or newer) lite arm64 image from Raspberry Pi OS downloads.
+# Replace @@HOSTNAME@@ (see lab/pi/bootstrap/render_cloud_init.sh).
+
+hostname: @@HOSTNAME@@
+manage_etc_hosts: true
+timezone: @@TIMEZONE@@
+locale: @@LOCALE@@
+# Pi OS extension — turn SSH on at first boot.
+enable_ssh: true
+
+@@OPTIONAL_SSH_USERS@@
+# Use the full SD card: grow the root partition and filesystem on first boot.
+# (Works with typical Raspberry Pi OS layouts: FAT boot + swap + Linux root.)
+resize_rootfs: true
+growpart:
+  mode: auto
+  devices: ['/']
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - openssh-server
+  - git
+  - ca-certificates
+  - curl
+  - rsync
+  - python3
+  - python3-pip
+  - python3-venv
+  - picotool
+  - avrdude
+  - i2c-tools
+  - libusb-1.0-0
+  - udev
+  - usbutils
+
+runcmd:
+  - [ sh, -c, "command -v raspi-config >/dev/null && raspi-config nonint do_i2c 0 || true" ]
+
+final_message: "CEDE base packages installed. Log in, sync the cede repo, then: sudo lab/pi/bootstrap/bootstrap_pi.sh --hostname @@HOSTNAME@@"

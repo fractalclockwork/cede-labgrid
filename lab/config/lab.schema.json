@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cede.local/schemas/lab.schema.json",
+  "title": "CEDE lab configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "hosts", "serial", "paths", "i2c_matrix"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "hosts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dev_host": { "$ref": "#/$defs/hostEntry" },
+        "pi": { "$ref": "#/$defs/hostEntry" }
+      },
+      "required": ["dev_host", "pi"]
+    },
+    "serial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaults", "devices"],
+      "properties": {
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baud": { "type": "integer", "minimum": 300 },
+            "newline": { "type": "string" },
+            "timeout_s": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "required": ["baud", "newline", "timeout_s"]
+        },
+        "devices": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/serialDevice" },
+          "minProperties": 1
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pico_build",
+        "pico_uf2_glob",
+        "uno_build",
+        "uno_hex_glob",
+        "logs_dir",
+        "test_results_dir"
+      ],
+      "properties": {
+        "pico_build": { "type": "string" },
+        "pico_uf2_glob": { "type": "string" },
+        "uno_build": { "type": "string" },
+        "uno_hex_glob": { "type": "string" },
+        "logs_dir": { "type": "string" },
+        "test_results_dir": { "type": "string" }
+      }
+    },
+    "i2c_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bus_hz", "probe_address", "pairs"],
+      "properties": {
+        "bus_hz": { "type": "integer", "minimum": 1000 },
+        "probe_address": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "pairs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/i2cPair" },
+          "minItems": 1
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "prefix": { "type": "string" }
+      },
+      "required": ["enabled"]
+    },
+    "raspberry_pi_bootstrap": {
+      "$ref": "#/$defs/raspberryPiBootstrap"
+    }
+  },
+  "$defs": {
+    "hostEntry": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["role"],
+      "properties": {
+        "role": { "type": "string" },
+        "repo_root": { "type": "string" },
+        "ssh_host": { "type": "string" },
+        "ssh_user": { "type": "string" }
+      }
+    },
+    "serialDevice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fallback_globs"],
+      "properties": {
+        "by_id_glob": { "type": "string" },
+        "fallback_globs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "i2cPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initiator", "target", "status"],
+      "properties": {
+        "initiator": {
+          "type": "string",
+          "enum": ["rpi", "pico", "uno"]
+        },
+        "target": {
+          "type": "string",
+          "enum": ["rpi", "pico", "uno"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["enabled", "n/a"]
+        },
+        "reason": { "type": "string" },
+        "linux_bus": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "n/a" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["reason"] }
+        }
+      ]
+    },
+    "raspberryPiBootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short hostname for cloud-init; align hosts.pi.ssh_host with <hostname>.local for mDNS."
+        },
+        "authorized_keys_file": {
+          "type": "string",
+          "description": "Dev-Host path to SSH public key(s) for passwordless first-boot SSH."
+        },
+        "os_image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "description": "HTTPS URL or path to Raspberry Pi OS Lite arm64 .img or .img.xz for rpi-imager."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "Expected SHA256 for rpi-imager --sha256 (hex)."
+            },
+            "cache_path": {
+              "type": "string",
+              "description": "Optional Dev-Host path to cache the downloaded image."
+            }
+          },
+          "required": ["url"]
+        },
+        "wifi": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ssid": { "type": "string", "minLength": 1 },
+            "regulatory_domain": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2,
+              "description": "ISO 3166-1 alpha-2 for Wi‑Fi regulatory-domain in network-config (default US)."
+            },
+            "psk": {
+              "type": "string",
+              "description": "Wi-Fi passphrase (prefer psk_file for secrets)."
+            },
+            "psk_file": {
+              "type": "string",
+              "description": "Path to a file containing the passphrase (single line)."
+            }
+          },
+          "required": ["ssid"]
+        },
+        "timezone": {
+          "type": "string",
+          "description": "e.g. UTC or America/New_York"
+        },
+        "locale": {
+          "type": "string",
+          "description": "e.g. en_US.UTF-8"
+        }
+      }
+    }
+  }
+}

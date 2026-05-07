@@ -1,0 +1,72 @@
+# --- Build outputs (firmware / embedded) ---
+**/build/
+*.uf2
+*.hex
+*.elf
+*.map
+*.bin
+*.o
+*.a
+
+# --- Disk images & VM media (Pi OS, QEMU, stray downloads) ---
+# Cached Pi images live under lab/pi/dist/ (below); patterns here catch copies elsewhere.
+*.img
+*.img.xz
+*.iso
+*.qcow2
+*.vmdk
+*.vdi
+*.raw
+*.dmg
+*.ova
+
+# --- Local lab / secrets ---
+lab/config/lab.yaml
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+/dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# --- Test / runtime artefacts ---
+lab/tests/results/
+lab/pi/logs/
+
+# --- Pi bootstrap / SD card tooling ---
+lab/pi/dist/
+lab/pi/cloud-init/rendered/
+
+# --- Editors & OS clutter ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.#*
+*.bak
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Ephemeral working dirs (local only) ---
+.tmp/
+.tmp.*
+*.tmp
+
+# Optional: local Docker Compose overrides (machine-specific binds)
+/docker-compose.override.yml
+**/docker-compose.override.yml

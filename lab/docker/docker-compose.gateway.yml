@@ -1,0 +1,27 @@
+# Raspberry Pi gateway: run orchestration container with USB access for Pico/Uno serial.
+# Prerequisites on the Pi: docker, and an ARM64 image loaded or pulled:
+#   cede/orchestration-dev:arm64
+#
+# From repo root on the Pi:
+#   docker compose -f lab/docker/docker-compose.gateway.yml run --rm orchestration-dev bash
+#
+# lab/config/lab.yaml should set serial paths; adjust `devices` below if you need specific ttys.
+
+name: cede-gateway
+
+services:
+  orchestration-dev:
+    image: cede/orchestration-dev:arm64
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    environment:
+      - CEDE_LAB_CONFIG=/workspace/lab/config/lab.yaml
+    group_add:
+      - dialout
+    devices:
+      - /dev/bus/usb
+    # Uncomment for fixed ACM devices after you know the paths:
+    # devices:
+    #   - /dev/ttyACM0
+    #   - /dev/ttyACM1

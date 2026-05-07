@@ -1,0 +1,25 @@
+name: CEDE smoke
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images and run smoke checks
+        run: |
+          make -C lab/docker build-images
+          make -C lab/docker smoke
+          make -C lab/docker pico-build
+          make -C lab/docker uno-build
+          make -C lab/docker test-config
+
+      - name: Pytest (config validation + Hello Lab scaffold)
+        run: |
+          docker compose -f lab/docker/docker-compose.yml run --rm orchestration-dev \
+            bash -lc 'cd /workspace && pytest -q lab/tests/'

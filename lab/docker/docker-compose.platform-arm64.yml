@@ -1,0 +1,12 @@
+# Merge: docker compose -f docker-compose.yml -f docker-compose.platform-arm64.yml build
+# Raspberry Pi 64-bit gateway / Apple Silicon; cross-build from amd64 needs binfmt (see Makefile setup-binfmt).
+name: cede
+services:
+  pico-dev:
+    platform: linux/arm64
+  arduino-dev:
+    platform: linux/arm64
+  orchestration-dev:
+    platform: linux/arm64
+  rpi-imager-dev:
+    platform: linux/arm64
