@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Push only the Pi-side files needed for `make -C lab/pi` flash helpers (no firmware, no Docker, no full tree).
+# Push only the Pi-side files needed for `make -C lab/pi` flash helpers (no firmware, no Docker, no full repo).
+# The destination (default ~/cede) is a sparse directory layout — do not replace it with `git clone`.
 #
 # Usage:
 #   ./sync_gateway_flash_deps.sh user@cede-pi.local
 #   ./sync_gateway_flash_deps.sh user@cede-pi.local /path/on/pi/cede   # optional explicit remote dir (-- dest)
-#   UNO_ONLY=1 ./sync_gateway_flash_deps.sh user@cede-pi.local        # skip Pico UF2 script if you only flash Uno
+#   UNO_ONLY=1 ./sync_gateway_flash_deps.sh user@cede-pi.local        # skip all Pico (cede-rp2) helpers; Uno-only sync
 
 set -euo pipefail
 
@@ -48,7 +49,13 @@ FILES=(
   lab/pi/scripts/pi_validate_uno_serial.py
 )
 if [[ "${UNO_ONLY:-}" != "1" ]]; then
-  FILES+=(lab/pi/scripts/pi_flash_pico_uf2.sh)
+  FILES+=(
+    lab/pi/scripts/pi_flash_pico_mount_lib.sh
+    lab/pi/scripts/pi_flash_pico_uf2.sh
+    lab/pi/scripts/pi_flash_pico_auto.sh
+    lab/pi/scripts/pi_resolve_gateway_pico.py
+    lab/pi/scripts/pi_validate_pico_serial.py
+  )
 fi
 
 rsync -avz \
@@ -57,3 +64,6 @@ rsync -avz \
   -R \
   "${FILES[@]}" \
   "${REMOTE}:${RDIR_RAW}"
+
+echo "==> gateway flash deps synced to ${REMOTE}:${RDIR_RAW}"
+echo "    On the Pi, run scripts from that same path (not a different checkout under ~/cede unless you synced there too)."

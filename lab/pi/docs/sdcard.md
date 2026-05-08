@@ -89,18 +89,21 @@ If Imager already set hostname/user/SSH, **either** rely on Imager **or** use re
 
 1. Boot the Pi with Ethernet (or Wi‑Fi if configured under **`raspberry_pi_bootstrap.wifi`**).
 2. SSH in as your user.
-3. Clone or rsync this repository onto the Pi (e.g. `~/cede`).
-4. Run the gateway installer (hostname must match your choice):
+3. **Do not clone the full CEDE repo on the gateway.** Cloud-init already installs **`picotool`**, **`avrdude`**, **`python3`**, and related packages for basic MCU access.
+4. Optional **gateway installer** (Docker, Arduino CLI, **`disk`** group, pip orchestration deps)—copy the script from your **Dev-Host** and run it once:
 
 ```bash
-cd ~/cede
-chmod +x lab/pi/bootstrap/bootstrap_pi.sh
-sudo ./lab/pi/bootstrap/bootstrap_pi.sh --hostname cede-pi
+# On Dev-Host (repo root):
+scp lab/pi/bootstrap/bootstrap_pi.sh pi@cede-pi.local:/tmp/bootstrap_pi.sh
+
+# On the Pi:
+chmod +x /tmp/bootstrap_pi.sh
+sudo /tmp/bootstrap_pi.sh --hostname cede-pi
 ```
 
-This installs **Docker**, **Arduino CLI** (user-local), **Python** orchestration dependencies, enables **I2C**, and configures groups for serial/USB.
+That installer pulls in **Docker**, **Arduino CLI** (user-local), **Python** orchestration dependencies, enables **I2C**, and configures groups for serial/USB. After it finishes, log out and back in (or reboot) so **docker** and **dialout** groups apply.
 
-Log out and back in (or reboot) so **docker** and **dialout** groups apply.
+For Pico/Uno flashing helpers only, use **`lab/pi/scripts/sync_gateway_flash_deps.sh`** from the Dev-Host (or **`make pi-gateway-sync`**)—that writes a **sparse** tree such as **`~/cede/lab/pi/`** (Makefile + scripts), not a full checkout. See [pico-uno-subtargets.md](pico-uno-subtargets.md).
 
 ## 4) Load ARM64 toolchain images (optional)
 

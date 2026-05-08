@@ -2,6 +2,8 @@
 
 Use this runbook **after** gateway bootstrapping has passed its **E2E** checks (patched `.img`, verify, flash, SSH). Pico/Uno flashing assumes a sane Pi OS gateway and a working **`ssh`** session — not half-repaired cloud-init.
 
+**Gateway layout:** do **not** install a **`git clone`** of CEDE on the Pi. Dev-Host pushes only [**`sync_gateway_flash_deps.sh`**](../scripts/sync_gateway_flash_deps.sh) artifacts (**`lab/pi/Makefile`**, **`lab/pi/scripts/*.py|.sh`**) into a **sparse** directory (default **`~/cede`**). Treat **`GATEWAY_REPO_ROOT`** as that flash-deps root, not a full repository.
+
 **Order:** finish the **[Gateway E2E verification gate](rpi3-gateway-remote.md#gateway-e2e-verification-gate)** (`make validate`, **`make pi-gateway-sd-ready`**, **`pi-gateway-verify-boot`**, bench flash, then **`ping`** + **`ssh`**). Fix wrong **`user-data`**, missing keys, or sudo policy by **remounting the SD or loop-mounting the `.img`** and re-running **`prepare_sdcard_boot.sh`** / **`patch-image`** ([cli-flash.md](cli-flash.md)); do not chase bring-up bugs by editing `/etc` on the live Pi from this workflow.
 
 ---
@@ -12,38 +14,47 @@ These pieces are wired and repeatable from the **Dev-Host** without opening an i
 
 | Step | What proves it |
 |------|----------------|
-| Minimal sync to gateway | Makefile + helpers under **`lab/pi/`** only ([`sync_gateway_flash_deps.sh`](../scripts/sync_gateway_flash_deps.sh); optional **`UNO_ONLY=1`** to omit Pico UF2 helper) |
-| Uno **`PORT`** | Gateway-side [`pi_resolve_gateway_uno.py`](../scripts/pi_resolve_gateway_uno.py): **`/dev/serial/by-id/usb-Arduino*`** first; else unique **`ttyUSB*`**; else **`ttyACM*`** excluding devices whose realpath is a Pico symlink under **`glob /dev/serial/by-id/usb-Raspberry_Pi*`**. Ambiguous ⇒ fail (**`PORT=`** override). |
-| Flash + verify firmware | **`avrdude`** on Pi via [`pi_flash_uno_avrdude.sh`](../scripts/pi_flash_uno_avrdude.sh); **verified bytes on device** printed by avrdude. |
-| Serial data path | **`hello_lab.ino`** prints **`CEDE hello_lab ok`** @ 115200; [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py) (pyserial **or** **`stty`** + ioctl) checks the banner. |
-| Offline tests | `uv run pytest -q lab/tests/test_uno_gateway_env.py` (resolver + lab config expectations; **no hardware**). |
-| Hardware pytest stub | `test_flash_uno_from_pi` in [`lab/tests/test_hello_lab_matrix.py`](../../tests/test_hello_lab_matrix.py) remains **`@pytest.mark.hardware`** skipped until wired for Pi‑native pytest. |
+| Minimal sync to gateway | Makefile + helpers under **`lab/pi/`** only ([`sync_gateway_flash_deps.sh`](../scripts/sync_gateway_flash_deps.sh); **`UNO_ONLY=1`** omits **all** Pico **`cede-rp2`** helpers). |
+| **cede-uno** **`PORT`** | Gateway-side [`pi_resolve_gateway_uno.py`](../scripts/pi_resolve_gateway_uno.py): **`/dev/serial/by-id/usb-Arduino*`** first; else unique **`ttyUSB*`**; else **`ttyACM*`** excluding Pico **`by-id`** realpaths. Ambiguous ⇒ fail (**`PORT=`** override). |
+| **cede-rp2** **`PORT`** | Gateway-side [`pi_resolve_gateway_pico.py`](../scripts/pi_resolve_gateway_pico.py): **`/dev/serial/by-id/usb-Raspberry_Pi*`** first; else lone **`ttyACM*`** not claimed by **`usb-Arduino*`** . |
+| Flash + verify (Uno) | **`avrdude`** via [`pi_flash_uno_avrdude.sh`](../scripts/pi_flash_uno_avrdude.sh). |
+| Flash UF2 (**cede-rp2**) | [`pi_flash_pico_auto.sh`](../scripts/pi_flash_pico_auto.sh): tries **`picotool reboot -uf`** (`-f` helps when prior firmware is USB serial, e.g. MicroPython) when the Pi’s **`picotool`** build includes USB (**`reboot`** command); waits for **`RPI-RP2`**; copies UF2. **`PICO_BOOTSEL_ONLY=1`** skips **`picotool`** (Pico already in BOOTSEL). Fallback: [`pi_flash_pico_uf2.sh`](../scripts/pi_flash_pico_uf2.sh). |
+| Serial (**cede-uno**) | **`CEDE hello_lab ok`** @ 115200; [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py). |
+| Serial (**cede-rp2**) | **`CEDE hello_lab rp2 ok`** from USB CDC; [`pi_validate_pico_serial.py`](../scripts/pi_validate_pico_serial.py). |
+| Offline tests | `pytest lab/tests/test_uno_gateway_env.py`, **`lab/tests/test_pico_gateway_env.py`**. |
+| Hardware pytest stubs | [`test_hello_lab_matrix.py`](../../tests/test_hello_lab_matrix.py) (`test_flash_*_from_pi`) — still skipped until Pi-hosted automation. |
 
-Pico BOOTSEL/`picotool` paths below are unchanged; this document’s **automated Dev-Host targets** centre on **Uno** unless you extend them similarly.
+**Naming:** **`cede-pi`** = gateway host; **`cede-uno`** / **`cede-rp2`** = logical MCU subtargets (docs / Make); future **`cede-rp2-micropython`** is out of scope here.
+
+Pico **`RPI-RP2`** is the BOOTSEL volume label (unchanged).
 
 ---
 
 ## Dev-host driver (stay on workstation)
 
-Root [`Makefile`](../../../Makefile) invokes [`devhost_pi_gateway.sh`](../scripts/devhost_pi_gateway.sh) over **`ssh`** to **`GATEWAY`** (default `pi@cede-pi.local`, tree at **`GATEWAY_REPO_ROOT`** default literal `~/cede` on the Pi — do not Bash‑expand **`~`** in defaults on the Dev-Host).
+Root [`Makefile`](../../../Makefile) invokes [`devhost_pi_gateway.sh`](../scripts/devhost_pi_gateway.sh) over **`ssh`** to **`GATEWAY`** (default `pi@cede-pi.local`). **`GATEWAY_REPO_ROOT`** is the **sparse** flash-deps directory on the Pi (default **`~/cede`**); omit it for that default, or set **`GATEWAY_REPO_ROOT='~/src/cede'`** (quoted so GNU Make / the shell does not expand **`~`** to the dev-host home). **`sync_gateway_flash_deps.sh`** writes **`lab/pi/…`** under that root — still **not** a full **`git clone`**.
 
 ```bash
 make -C lab/docker uno-build
+make -C lab/docker pico-build
 make pi-gateway-health GATEWAY=pi@cede-pi.local
 
-# Typical Uno smoke: sync helpers, scp HEX, resolve PORT on Pi, avrdude, then banner check:
+# cede-uno: sync, scp HEX, resolve PORT, avrdude, serial banner
 make pi-gateway-flash-test-uno GATEWAY=pi@cede-pi.local
-# Override when the resolver refuses (multiple ACM / clones):
-make pi-gateway-flash-uno GATEWAY=pi@cede-pi.local PORT=/dev/ttyACM0
 
-make pi-gateway-resolve-port-uno GATEWAY=pi@cede-pi.local   # print PORT only
-make pi-gateway-print-serial GATEWAY=pi@cede-pi.local       # ttyACM/ttyUSB list on Pi
+# cede-rp2: sync Pico helpers, scp UF2, flash (picotool reboot -uf when available), serial banner
+make pi-gateway-flash-test-pico GATEWAY=pi@cede-pi.local
+# Pico already in BOOTSEL or picotool without USB:
+make pi-gateway-flash-pico GATEWAY=pi@cede-pi.local PICO_BOOTSEL_ONLY=1
 
-# HEX=/abs/path/hello.ino.hex  SKIP_SYNC=1  UNO_ONLY=1  as needed (see Makefile help)
-make help    # Pi gateway bullet list
+make pi-gateway-resolve-port-uno GATEWAY=pi@cede-pi.local
+make pi-gateway-resolve-port-pico GATEWAY=pi@cede-pi.local
+make pi-gateway-print-serial GATEWAY=pi@cede-pi.local
+
+make help
 ```
 
-**Script directly:** `lab/pi/scripts/devhost_pi_gateway.sh` — **`health`**, **`resolve-port-uno`**, **`subtarget-check`**, **`print-serial`**, **`sync`** (delegates to `sync_gateway_flash_deps.sh`), **`flash-uno`**, **`validate-uno-serial`**.
+**Script directly:** `lab/pi/scripts/devhost_pi_gateway.sh` — **`health`**, **`resolve-port-uno`**, **`resolve-port-pico`**, **`subtarget-check`**, **`print-serial`**, **`sync`**, **`flash-uno`**, **`flash-pico`**, **`validate-uno-serial`**, **`validate-pico-serial`**.
 
 Logical serial globs for **docs/tests** (`discover_serial.py`, `lab.yaml`) live under **`serial.devices.uno`** in [`lab.example.yaml`](../../config/lab.example.yaml).
 
@@ -51,23 +62,16 @@ Logical serial globs for **docs/tests** (`discover_serial.py`, `lab.yaml`) live 
 
 ## 1) Prerequisites on the Pi
 
-Run **on the Pi** (optional if Dev-Host **`make pi-gateway-health`** is enough):
+With [**`sync_gateway_flash_deps.sh`**](../scripts/sync_gateway_flash_deps.sh) applied (or **`make pi-gateway-sync`** from Dev-Host), helpers live under **`${GATEWAY_REPO_ROOT}/lab/pi/`**. Example **`GATEWAY_REPO_ROOT=~/cede`**:
 
 ```bash
-cd ~/cede   # adjust to GATEWAY_REPO_ROOT
+cd ~/cede    # sparse flash-deps root only — not a full repo checkout
 python3 lab/pi/scripts/health_check.py
 ```
 
 Expected output includes `health: ok (picotool, avrdude, python3 present)`.
 
-Bootstrap if tools are missing:
-
-```bash
-cd ~/cede
-sudo ./lab/pi/bootstrap/bootstrap_pi.sh --hostname cede-pi
-```
-
-Full repo checkout on the Pi is **not** required for the minimal sync path—you only need the directories **`sync_gateway_flash_deps.sh`** publishes (Makefile + **`lab/pi/scripts/*.py|.sh`**).
+**Extra gateway packages** (Docker, Arduino CLI, **`disk`** group, pip deps): copy **`lab/pi/bootstrap/bootstrap_pi.sh`** from Dev-Host and run on the Pi (**`scp`** + **`sudo /tmp/bootstrap_pi.sh --hostname …`**); see [sdcard.md](sdcard.md) §3 — still **no** full-tree **`git clone`** on the gateway.
 
 ---
 
@@ -76,7 +80,8 @@ Full repo checkout on the Pi is **not** required for the minimal sync path—you
 From the repo root on Dev-Host:
 
 ```bash
-make -C lab/docker pico-build
+make -C lab/docker pico-build                 # default: plain Pico (`PICO_BOARD=pico`)
+make -C lab/docker pico-build PICO_BOARD=pico_w   # Pico W
 make -C lab/docker uno-build
 ```
 
@@ -122,7 +127,7 @@ sync
 Or from synced helpers on the Pi:
 
 ```bash
-cd ~/cede
+cd ~/cede   # sparse flash-deps root (sync_gateway_flash_deps.sh)
 make -C lab/pi flash-pico-uf2 UF2=/tmp/hello_lab.uf2
 ```
 
@@ -146,10 +151,10 @@ avrdude -p atmega328p -c arduino -P /dev/serial/by-id/usb-Arduino_… -b 115200 
   -U flash:w:/tmp/hello_lab.ino.hex:i
 ```
 
-From the synced repo on the Pi:
+From the synced helpers on the Pi:
 
 ```bash
-cd ~/cede
+cd ~/cede   # sparse flash-deps root
 make -C lab/pi flash-uno HEX=/tmp/hello_lab.ino.hex PORT=/dev/serial/by-id/usb-Arduino_…
 # or PORT=/dev/ttyACM0 / ttyUSB0 when unambiguous on your bench
 ```
@@ -162,7 +167,7 @@ make -C lab/pi flash-uno HEX=/tmp/hello_lab.ino.hex PORT=/dev/serial/by-id/usb-A
 
 ```bash
 # On gateway (needs synced pi_validate_uno_serial.py):
-cd ~/cede
+cd ~/cede   # sparse flash-deps root
 make -C lab/pi resolve-uno-port
 make -C lab/pi validate-uno-serial PORT=/dev/ttyACM0   # exact PORT required here
 ```
@@ -189,20 +194,26 @@ Optional **`picocom`**: **`picocom -b 115200 <PORT>`**; exit with **`Ctrl-A`** t
 
 ## 7) Automation on the Pi (`lab/pi/Makefile`)
 
-With repo helpers under **`~/cede`**:
+With synced helpers under **`~/cede`** (or **`GATEWAY_REPO_ROOT`** — **sparse** tree only):
 
 ```bash
+cd ~/cede   # sparse flash-deps root
 make -C lab/pi help
 make -C lab/pi subtarget-check
 make -C lab/pi resolve-uno-port
 make -C lab/pi print-serial
 make -C lab/pi validate-uno-serial PORT=/dev/ttyACM0
 
-make -C lab/pi flash-pico-uf2 UF2=/tmp/hello_lab.uf2
+make -C lab/pi flash-pico-auto UF2=/tmp/hello_lab.uf2           # cede-rp2: picotool reboot -uf then UF2 copy
+make -C lab/pi flash-pico-auto UF2=/tmp/hello_lab.uf2 PICO_BOOTSEL_ONLY=1   # BOOTSEL already / no picotool USB
+make -C lab/pi flash-pico-uf2 UF2=/tmp/hello_lab.uf2          # copy only (RPI-RP2 already mounted)
+make -C lab/pi resolve-pico-port
+make -C lab/pi validate-pico-serial PORT=/dev/ttyACM0
+
 make -C lab/pi flash-uno HEX=/tmp/hello_lab.ino.hex PORT=<resolved_path>
 ```
 
-**Scripts:** [`pi_flash_pico_uf2.sh`](../scripts/pi_flash_pico_uf2.sh), [`pi_flash_uno_avrdude.sh`](../scripts/pi_flash_uno_avrdude.sh), [`pi_resolve_gateway_uno.py`](../scripts/pi_resolve_gateway_uno.py), [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py).
+**Scripts:** [`pi_flash_pico_auto.sh`](../scripts/pi_flash_pico_auto.sh), [`pi_flash_pico_uf2.sh`](../scripts/pi_flash_pico_uf2.sh), [`pi_resolve_gateway_pico.py`](../scripts/pi_resolve_gateway_pico.py), [`pi_validate_pico_serial.py`](../scripts/pi_validate_pico_serial.py), [`pi_flash_uno_avrdude.sh`](../scripts/pi_flash_uno_avrdude.sh), [`pi_resolve_gateway_uno.py`](../scripts/pi_resolve_gateway_uno.py), [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py).
 
 **Dev-Host** remains authoritative for **`make -C lab/docker pico-build` / `uno-build`** unless you duplicate Arduino CLI bootstrap on the Pi.
 
@@ -212,6 +223,7 @@ make -C lab/pi flash-uno HEX=/tmp/hello_lab.ino.hex PORT=<resolved_path>
 
 ```bash
 uv run pytest -q lab/tests/test_uno_gateway_env.py
+uv run pytest -q lab/tests/test_pico_gateway_env.py
 ```
 
-Covers **`resolve_uno_tty()`** heuristics (mocked **glob**/paths), **`lab.example.yaml`** **`uno`** serial stanza, **`hello_lab`** banner string, **`sync_gateway_flash_deps.sh`** file list hooks, and **`discover_serial.py`** **`uno`** resolution against real YAML/mocked sysfs.
+Covers **`resolve_uno_tty()`** / **`resolve_pico_tty()`** heuristics (mocked **glob**/paths), **`lab.example.yaml`** **`uno`** serial stanza, **`hello_lab`** banner strings (Uno `.ino` / Pico **`main.c`**), **`sync_gateway_flash_deps.sh`** file list hooks, and **`discover_serial.py`** **`uno`** resolution against real YAML/mocked sysfs.

@@ -191,12 +191,14 @@ smoke: build-images
 	$(COMPOSE) run --rm arduino-dev bash -lc 'avr-gcc --version && avrdude -v 2>&1 | head -n 1 && arduino-cli version'
 	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest"'
 
+# Plain Pico by default; Pico W: make pico-build PICO_BOARD=pico_w.
+PICO_BOARD ?= pico
 pico-build:
 	$(COMPOSE) run --rm pico-dev bash -lc '\
 		set -e; \
 		cd /workspace/lab/pico/hello_lab && \
 		rm -rf build && mkdir build && cd build && \
-		cmake -GNinja -DCMAKE_BUILD_TYPE=Release .. && \
+		cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=$(PICO_BOARD) .. && \
 		ninja \
 	'
 

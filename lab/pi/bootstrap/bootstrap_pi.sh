@@ -7,7 +7,7 @@
 #   sudo CEDE_HOSTNAME=cede-gateway ./bootstrap_pi.sh
 #
 # Optional env:
-#   CEDE_GATEWAY_USER — non-root user to add to docker,dialout,i2c (default: first sudo user or $SUDO_USER)
+#   CEDE_GATEWAY_USER — non-root user to add to docker,dialout,i2c,disk (default: first sudo user or $SUDO_USER)
 
 set -euo pipefail
 
@@ -85,6 +85,7 @@ apt-get install -y --no-install-recommends \
   curl \
   rsync \
   python3 \
+  python3-serial \
   python3-venv \
   python3-pip \
   picotool \
@@ -112,10 +113,13 @@ else
 fi
 
 if [[ -n "${GATEWAY_USER}" ]] && id "${GATEWAY_USER}" >/dev/null 2>&1; then
-  echo "==> Groups for ${GATEWAY_USER}: dialout, plugdev, i2c, gpio, docker"
+  echo "==> Groups for ${GATEWAY_USER}: dialout, plugdev, i2c, gpio, docker, disk"
   usermod -aG dialout,plugdev,i2c,gpio "${GATEWAY_USER}" 2>/dev/null || true
   # gpio group may not exist on all images
   getent group gpio >/dev/null && usermod -aG gpio "${GATEWAY_USER}" || true
+  if getent group disk >/dev/null; then
+    usermod -aG disk "${GATEWAY_USER}"
+  fi
   if [[ "${SKIP_DOCKER}" -eq 0 ]] && getent group docker >/dev/null; then
     usermod -aG docker "${GATEWAY_USER}"
   fi
@@ -163,7 +167,7 @@ fi
 echo ""
 echo "Bootstrap finished."
 echo " - Hostname: ${HOSTNAME}"
-echo " - Re-login (or reboot) for group membership (docker, dialout)."
-echo " - Clone/sync this repo on the Pi and set lab/config/lab.yaml ssh_host to this hostname."
+echo " - Re-login (or reboot) for group membership (docker, dialout, disk)."
+echo " - Do not git clone the full CEDE repo on the gateway—Dev-Host builds firmware and rsyncs flash deps (sync_gateway_flash_deps.sh)."
 echo " - Dev-Host: build ARM64 gateway images: make -C lab/docker build-gateway-images"
 echo " - Optional HDMI kiosk dashboard: see lab/pi/docs/dashboard-hdmi.md"

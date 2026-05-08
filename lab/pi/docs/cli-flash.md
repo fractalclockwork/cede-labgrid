@@ -313,11 +313,7 @@ Use this when you want **one downloaded artifact**, **CEDE cloud-init baked into
    # or: ssh pi@$(getent hosts <hostname>.local | awk '{print $1}')
    ```
 
-6. **Gateway installer** on the Pi (see [sdcard.md](sdcard.md) §3):
-
-   ```bash
-   sudo ./lab/pi/bootstrap/bootstrap_pi.sh --hostname <hostname>
-   ```
+6. **Optional gateway installer** on the Pi (see [sdcard.md](sdcard.md) §3): copy **`lab/pi/bootstrap/bootstrap_pi.sh`** from the Dev-Host (**`scp`** to **`/tmp/`**), then **`sudo /tmp/bootstrap_pi.sh --hostname <hostname>`**. Do not clone the full repo on the gateway; Pico/Uno workflows sync only **`sync_gateway_flash_deps.sh`** artifacts.
 
 **Note:** If you skip patching the `.img`, you can instead **`flash`** from **`lab.yaml`** (writes the URL with **`rpi-imager`**, then injects cloud-init on the card):
 

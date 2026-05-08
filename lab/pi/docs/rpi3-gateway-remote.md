@@ -72,7 +72,7 @@ Close **gateway validation** before opening [pico-uno-subtargets.md](pico-uno-su
 | 1 | Dev-Host | **`make validate`** — pytest for config schema, cloud-init render, and the offline SSH-key pipeline (no hardware). |
 | 2 | Dev-Host | **`make pi-gateway-sd-ready`** — patch the raw `.img` and run **`make pi-gateway-verify-boot`** so boot **`user-data`** matches **`lab/pi/cloud-init/rendered/`**. |
 | 3 | Bench | Flash the SD (below, § 3 *Flash*) or inject boot files on a mounted card (see **[cli-flash.md](cli-flash.md)**). |
-| 4 | LAN | **`ping`** + **`ssh`** (§ 4 *Boot*); optional **`sudo ./lab/pi/bootstrap/bootstrap_pi.sh`** for packages on the Pi. |
+| 4 | LAN | **`ping`** + **`ssh`** (§ 4 *Boot*); optional **`bootstrap_pi.sh`** copied from Dev-Host (**`scp`** + **`sudo /tmp/bootstrap_pi.sh`**) for Docker/Arduino extras — never a full **`git clone`** on the gateway. |
 
 Wrong cloud-init, missing keys, or sudo for **`pi`** are fixed by **changing the FAT boot payload** (or the golden `.img`) and re-flashing or rebooting — not by bespoke edits to the running root filesystem in this repo’s process.
 

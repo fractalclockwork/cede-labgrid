@@ -5,9 +5,17 @@
 #   ./pi_flash_pico_uf2.sh --uf2 /path/hello.uf2 --yes
 #   ./pi_flash_pico_uf2.sh --uf2 /path/hello.uf2 --mount /media/$USER/RPI-RP2 --yes
 #
-# Without --mount, searches /media/*/RPI-RP2 and /run/media/*/RPI-RP2.
+# Without --mount, resolves /media/*/RPI-RP2, /run/media/*/RPI-RP2, or /dev/disk/by-label/RPI-RP2 (udisks mount).
 
 set -euo pipefail
+
+_PI_FLASH_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pi_flash_pico_mount_lib.sh"
+if [[ ! -f "${_PI_FLASH_LIB}" ]]; then
+  echo "error: missing ${_PI_FLASH_LIB}" >&2
+  exit 1
+fi
+# shellcheck source=pi_flash_pico_mount_lib.sh
+source "${_PI_FLASH_LIB}"
 
 usage() {
   sed -n '1,14p' "$0"
@@ -52,26 +60,17 @@ if [[ -z "${UF2}" ]] || [[ ! -f "${UF2}" ]]; then
   exit 1
 fi
 
-find_rpi_rp2_mount() {
-  local d
-  for d in /media/*/"RPI-RP2" /run/media/*/"RPI-RP2"; do
-    if [[ -d "$d" ]]; then
-      if command -v mountpoint >/dev/null 2>&1; then
-        mountpoint -q "$d" 2>/dev/null || continue
-      fi
-      echo "$d"
-      return 0
-    fi
-  done
-  return 1
-}
-
 if [[ -z "${MOUNT}" ]]; then
   MOUNT="$(find_rpi_rp2_mount)" || true
 fi
 
 if [[ -z "${MOUNT}" ]] || [[ ! -d "${MOUNT}" ]]; then
-  echo "error: BOOTSEL volume RPI-RP2 not mounted. Hold BOOTSEL, plug Pico USB, then retry." >&2
+  echo "note: no mount point; trying verified raw RPI-RP2 partition write …" >&2
+  if try_fallback_uf2_to_rpi_rp2_partition "${UF2}" 15; then
+    echo "==> Done. Pico should reboot; RPI-RP2 may disappear."
+    exit 0
+  fi
+  echo "error: BOOTSEL volume RPI-RP2 not found. Hold BOOTSEL, plug Pico USB, then retry." >&2
   echo "       Or pass --mount /full/path/to/RPI-RP2" >&2
   exit 1
 fi

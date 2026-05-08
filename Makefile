@@ -1,7 +1,7 @@
 # Repository root — Python tooling via uv (https://docs.astral.sh/uv/)
 REPO_ROOT := $(abspath .)
 
-.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-flash-uno pi-gateway-validate-uno pi-gateway-flash-test-uno test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
+.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-flash-test-uno pi-gateway-flash-test-pico test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
 
 help:
 	@echo "Python (uv):"
@@ -33,18 +33,25 @@ help:
 	@echo "Pico/Uno flash from Pi (SSH on Pi): make -C lab/pi help — lab/pi/docs/pico-uno-subtargets.md"
 	@echo "Pico/Uno from dev-host (SSH into Pi, no shell on Pi):"
 	@echo "  make pi-gateway-health | pi-gateway-subtarget-check | pi-gateway-print-serial — remote checks"
-	@echo "  make pi-gateway-resolve-port-uno — print Uno tty chosen on the gateway (by-id/ttyUSB/ACM heuristic)"
+	@echo "  make pi-gateway-resolve-port-uno — print cede-uno tty chosen on the gateway"
+	@echo "  make pi-gateway-resolve-port-pico — print cede-rp2 (Pico) tty on the gateway"
 	@echo "  make pi-gateway-flash-uno [PORT=/dev/tty…] [HEX=path] [SKIP_SYNC=1] — PORT omitted: gateway resolves"
-	@echo "  make pi-gateway-validate-uno [PORT=…] [SKIP_SYNC=1] — serial banner; PORT omitted: sync+resolve"
-	@echo "  make pi-gateway-flash-test-uno [PORT=…] — flash then validate (second step skips redundant sync)"
+	@echo "  make pi-gateway-flash-pico [UF2=path] [PICO_BOOTSEL_ONLY=1] [PICO_WAIT_MOUNT=…] [SKIP_SYNC=1] — cede-rp2 UF2 (default mount poll ≈3s on Pi; raise if desktop needs automount)"
+	@echo "  make pi-gateway-validate-uno [PORT=…] [SKIP_SYNC=1] [UNO_VALIDATE_WAIT=8] — Uno serial banner"
+	@echo "  make pi-gateway-validate-pico [PORT=…] [SKIP_SYNC=1] [PICO_VALIDATE_WAIT=3] — cede-rp2 serial banner (override if slow USB)"
+	@echo "  make pi-gateway-flash-test-uno [PORT=…] — flash then validate Uno"
+	@echo "  make pi-gateway-flash-test-pico [UF2=…] [PICO_BOOTSEL_ONLY=1] — flash then validate cede-rp2"
 	@echo "  make sync-pi-gateway-flash-deps / pi-gateway-sync — rsync only lab/pi Makefile + flash scripts (no Docker/firmware tree)"
-	@echo "    Uno-only: UNO_ONLY=1 make pi-gateway-sync GATEWAY=… GATEWAY_REPO_ROOT=~/cede"
+	@echo "    Uno-only: UNO_ONLY=1 make pi-gateway-sync GATEWAY=…"
+	@echo "    Pi repo path: omit GATEWAY_REPO_ROOT for ~/cede on Pi; or quote — GATEWAY_REPO_ROOT='~/src/cede' (unquoted ~/… expands to dev-host home in GNU Make)"
 
 # Push minimal Pi-gateway files for `make -C lab/pi flash-uno` / subtarget-check (see lab/pi/scripts/sync_gateway_flash_deps.sh).
 GATEWAY ?= pi@cede-pi.local
-GATEWAY_REPO_ROOT ?= ~/cede
+# Remote checkout on the Pi. Leave empty: sync uses literal ~/cede on the gateway (see sync_gateway_flash_deps.sh).
+# Do not use ?= ~/… here — GNU Make expands ~ to this machine's home and breaks ssh/rsync targets.
+GATEWAY_REPO_ROOT ?=
 sync-pi-gateway-flash-deps:
-	cd "$(REPO_ROOT)" && UNO_ONLY="$(UNO_ONLY)" bash lab/pi/scripts/sync_gateway_flash_deps.sh "$(GATEWAY)" "$(GATEWAY_REPO_ROOT)"
+	cd "$(REPO_ROOT)" && UNO_ONLY="$(UNO_ONLY)" bash lab/pi/scripts/sync_gateway_flash_deps.sh "$(GATEWAY)" $(if $(strip $(GATEWAY_REPO_ROOT)),"$(GATEWAY_REPO_ROOT)",)
 
 pi-gateway-sync: sync-pi-gateway-flash-deps
 
@@ -63,16 +70,35 @@ pi-gateway-resolve-port-uno:
 
 # Default HEX path: Arduino CLI output for hello_lab; override HEX=...
 HEX ?= $(REPO_ROOT)/lab/uno/hello_lab/build/hello_lab.ino.hex
+UNO_VALIDATE_WAIT ?= 8
 SKIP_SYNC ?=
 pi-gateway-flash-uno:
 	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UNO_ONLY="$(UNO_ONLY)" bash lab/pi/scripts/devhost_pi_gateway.sh flash-uno --hex "$(HEX)" $(if $(PORT),--port "$(PORT)",) $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
 pi-gateway-validate-uno:
-	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial $(if $(PORT),--port "$(PORT)",)
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial --wait "$(UNO_VALIDATE_WAIT)" $(if $(PORT),--port "$(PORT)",)
 
 pi-gateway-flash-test-uno:
-	@$(MAKE) pi-gateway-flash-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_ONLY="$(UNO_ONLY)"
-	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1
+	@$(MAKE) pi-gateway-flash-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)"
+	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"
+
+pi-gateway-resolve-port-pico:
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" bash lab/pi/scripts/devhost_pi_gateway.sh resolve-port-pico
+
+# Default UF2: Pico SDK build output for hello_lab (cede-rp2).
+UF2 ?= $(REPO_ROOT)/lab/pico/hello_lab/build/hello_lab.uf2
+PICO_BOOTSEL_ONLY ?=
+PICO_VALIDATE_WAIT ?= 3
+PICO_WAIT_MOUNT ?=
+pi-gateway-flash-pico:
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" bash lab/pi/scripts/devhost_pi_gateway.sh flash-pico --uf2 "$(UF2)" $(if $(filter 1,$(PICO_BOOTSEL_ONLY)),--bootsel-only,) $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
+
+pi-gateway-validate-pico:
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-pico-serial $(if $(PORT),--port "$(PORT)",)
+
+pi-gateway-flash-test-pico:
+	@$(MAKE) pi-gateway-flash-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" SKIP_SYNC="$(SKIP_SYNC)"
+	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
 
 sync:
 	cd "$(REPO_ROOT)" && uv sync

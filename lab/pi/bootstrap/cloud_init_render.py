@@ -29,7 +29,7 @@ def _read_ssh_keys(keys_file: Path) -> list[str]:
 # user stanza is present; a minimal entry with only ssh_authorized_keys can leave 'pi' without sudo).
 _PI_GATEWAY_GROUPS = (
     "users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,"
-    "gpio,spi,i2c,render,sudo"
+    "gpio,spi,i2c,render,disk,sudo"
 )
 
 
