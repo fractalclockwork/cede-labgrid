@@ -17,6 +17,7 @@ jobs:
           make -C lab/docker smoke
           make -C lab/docker pico-build
           make -C lab/docker uno-build
+          make pi-gateway-build-native-hello
           make -C lab/docker test-config
 
       - name: Pytest (config validation + Hello Lab scaffold)

@@ -13,6 +13,8 @@
 #   lab/pi/scripts/devhost_pi_gateway.sh flash-pico --uf2 … [--bootsel-only] [--no-sync]
 #   PICO_WAIT_MOUNT — optional seconds for RPI-RP2 mount poll (passed to Pi make flash-pico-auto)
 #   lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial | validate-pico-serial [--port …] [--digest GITSHORT]
+#   validate-gateway-native [--binary PATH] [--digest TOKEN] — Dev-Host builds aarch64 ELF; scp to /tmp on Pi;
+#        rsync flash deps only (sync_gateway_flash_deps.sh); Pi never needs a git checkout.
 
 set -euo pipefail
 
@@ -245,6 +247,43 @@ cmd_flash_pico() {
   fi
 }
 
+cmd_validate_gateway_native() {
+  local binary="" digest="" extra_args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --binary) binary="${2:?}"; shift 2 ;;
+      --digest) digest="${2:?}"; shift 2 ;;
+      -h|--help) usage 0 ;;
+      *) echo "unknown arg: $1" >&2; usage 1 ;;
+    esac
+  done
+
+  if [[ -z "${binary}" ]]; then
+    binary="${REPO_LOCAL}/lab/pi/native/hello_gateway/build/hello_gateway"
+  fi
+  binary="$(cd "${REPO_LOCAL}" && realpath "${binary}")"
+  if [[ ! -f "${binary}" ]]; then
+    echo "error: gateway hello binary not found: ${binary}" >&2
+    echo "hint: make pi-gateway-build-native-hello (aarch64 in Docker)" >&2
+    exit 1
+  fi
+
+  if [[ "${SKIP_SYNC:-}" != "1" ]]; then
+    sync_deps
+  fi
+
+  local scp_dest="/tmp/cede_hello_gateway"
+  echo "==> scp ${binary} -> ${GATEWAY}:${scp_dest}" >&2
+  scp "${binary}" "${GATEWAY}:${scp_dest}"
+  ssh "${GATEWAY}" "chmod +x '${scp_dest}'"
+
+  if [[ -n "${digest}" ]]; then
+    extra_args+=(--digest "${digest}")
+  fi
+  echo "==> ssh ${GATEWAY} validate hello_gateway (native; sparse ~/cede + /tmp binary only) …" >&2
+  remote python3 lab/pi/scripts/pi_validate_gateway_native.py "${extra_args[@]}" "${scp_dest}"
+}
+
 case "${1:-}" in
   "")
     usage 1
@@ -285,6 +324,10 @@ case "${1:-}" in
   flash-pico)
     shift
     cmd_flash_pico "$@"
+    ;;
+  validate-gateway-native)
+    shift
+    cmd_validate_gateway_native "$@"
     ;;
   *)
     echo "unknown command: $1" >&2

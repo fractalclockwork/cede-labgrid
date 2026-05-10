@@ -44,6 +44,7 @@ def test_sync_gateway_deps_lists_pico_cede_rp2_scripts(repo_root: Path) -> None:
         "pi_resolve_gateway_pico.py",
         "pi_validate_pico_serial.py",
         "cede_firmware_attest.py",
+        "pi_validate_gateway_native.py",
         "lab_i2c_matrix_validate.py",
         "pi_flash_pico_uf2.sh",
     ):

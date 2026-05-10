@@ -50,6 +50,21 @@ def test_attestation_uno_banner_digest_ok(repo_root: Path) -> None:
     assert m.attestation_failure_reason(buf, "uno", "feedface99") is None
 
 
+@pytest.mark.gateway
+def test_attestation_gateway_stdout_ok(repo_root: Path) -> None:
+    m = _load_attest(repo_root)
+    buf = b"CEDE hello_gateway ok digest=abc123deadbeef\n"
+    assert m.attestation_failure_reason(buf, "gateway", "abc123deadbeef") is None
+
+
+@pytest.mark.gateway
+def test_digest_banner_line_gateway(repo_root: Path) -> None:
+    m = _load_attest(repo_root)
+    buf = b"CEDE hello_gateway ok digest=t1_abcd1234\n"
+    assert m.digest_banner_line(buf, "gateway") == "CEDE hello_gateway ok digest=t1_abcd1234"
+
+
 def test_sync_lists_cede_firmware_attest(repo_root: Path) -> None:
     body = (repo_root / "lab" / "pi" / "scripts" / "sync_gateway_flash_deps.sh").read_text(encoding="utf-8")
     assert "cede_firmware_attest.py" in body
+    assert "pi_validate_gateway_native.py" in body

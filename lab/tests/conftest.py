@@ -10,6 +10,7 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "hardware: needs attached Pico/Uno/Pi")
     config.addinivalue_line("markers", "uno: Uno hello_lab / digest facet")
     config.addinivalue_line("markers", "pico: Pico hello_lab / digest facet")
+    config.addinivalue_line("markers", "gateway: Raspberry Pi gateway native hello_gateway / digest facet")
     config.addinivalue_line("markers", "pi_gateway: must run on Raspberry Pi")
     config.addinivalue_line(
         "markers",

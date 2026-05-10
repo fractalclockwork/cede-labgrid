@@ -4,6 +4,89 @@ Each **numbered stage** is **self-contained** for its intent. **Stage 0** is the
 
 **Naming (lab docs):** **cede-pi** = Raspberry Pi gateway; **cede-rp2** = Raspberry Pi Pico (USB `by-id`); **cede-uno** = Arduino Uno.
 
+The gateway keeps **only** a **sparse** tree (**`sync_gateway_flash_deps.sh`** → **`~/cede/lab/pi/…`**); do **not** **`git clone`** CEDE on **cede-pi**. UF2, HEX, and **`hello_gateway`** are built on the Dev-Host and copied (**`scp`**) by **`make pi-gateway-*`** targets.
+
+---
+
+## Validation command checklist (environment + targets)
+
+Use this section as the **operator index** after imaging **cede-pi** and wiring Pico/Uno. Order: **workspace → gateway → MCUs → I2C → (optional) gateway native**. **`GATEWAY`** defaults to **`pi@cede-pi.local`** in root **`Makefile`**; override when needed. **`unset DIGEST`** before smoke targets if your shell still exports an old **`DIGEST=`**.
+
+### 1. Dev-Host workspace (no USB hardware)
+
+| Goal | Command |
+|------|---------|
+| Python deps | **`uv sync`** (repo root) |
+| Config schema | **`make test-config-local`** or **`uv run pytest -q lab/tests/test_config_schema.py`** |
+| Toolchain + **hello_lab** artifacts + **hello_gateway** cross-build | **`make bootstrap-stage-dev-host`** |
+| CI-style container gate (Docker + builds + pytest in **orchestration-dev**) | **`make container-test-baseline`** |
+| Full lab pytest (no hardware) | **`make validate`** |
+
+**Pass:** commands exit 0; UF2/HEX under **`lab/pico/hello_lab/build/`** and **`lab/uno/hello_lab/build/`**; **`lab/pi/native/hello_gateway/build/hello_gateway`** exists (aarch64 ELF from Docker).
+
+### 2. cede-pi gateway (SSH; no MCU flash required)
+
+| Goal | Command |
+|------|---------|
+| Push **lab/pi** scripts only (sparse tree) | **`make pi-gateway-sync GATEWAY=pi@cede-pi.local`** (or **`UNO_ONLY=1`** for Uno-only sync) |
+| Health + subtarget check | **`make bootstrap-stage-gateway GATEWAY=pi@cede-pi.local`** |
+
+**Pass:** **`health: ok`**; when boards are connected, **by-id** serial devices resolve (see **`make pi-gateway-subtarget-check`** / **`print-serial`** in [pico-uno-subtargets.md](../pi/docs/pico-uno-subtargets.md)).
+
+### 3. MCU targets — flash + serial **`digest=`** attestation
+
+Build on Dev-Host first (**`make -C lab/docker pico-build`** / **`uno-build`**) or rely on paths from §1.
+
+| Target | Flash + serial validate (default **digest** = dev-host **git** short) |
+|--------|-----------------------------------------------------------------------|
+| **Pico (cede-rp2)** | **`make pi-gateway-flash-test-pico GATEWAY=pi@cede-pi.local`** |
+| **Uno (cede-uno)** | **`make pi-gateway-flash-test-uno GATEWAY=pi@cede-pi.local`** |
+| Serial only (already flashed) | **`make pi-gateway-validate-pico`** / **`make pi-gateway-validate-uno`** optional **`DIGEST=…`** **`PORT=…`** |
+
+**Pass:** banner lines contain **`digest=`** matching **`DIGEST`** when set, else repo git short; validators print **`digest-banner:`**.
+
+### 4. I2C — Pi as master (**hello_lab** addresses)
+
+Requires **`i2c-tools`** on **cede-pi**, wiring per **[bus-wiring.md](../pi/docs/bus-wiring.md)**.
+
+| Goal | Command |
+|------|---------|
+| All enabled rows from **`lab.yaml`** / **`lab.example.yaml`** | **`make pi-gateway-validate-i2c-from-lab GATEWAY=pi@cede-pi.local`** optional **`CEDE_LAB_CONFIG=…`** **`ONLY_I2C_PAIR=rpi,pico`** |
+| Pi → Pico then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-pico`** (alias **`pi-gateway-validate-pico-i2c`**) |
+| Pi → Uno then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-uno`** (alias **`pi-gateway-validate-uno-i2c`**) |
+| Both addresses + both USB banners | **`make pi-gateway-validate-i2c-both`** |
+| Flash one MCU + Pi **i2cget** | **`make pi-gateway-flash-test-pico-i2c`** / **`…-uno-i2c`** |
+
+### 5. Gateway native check (aarch64 **hello_gateway** on **cede-pi**)
+
+Built on Dev-Host; Pi holds **no** full repo — **sync** + **`scp`** binary to **`/tmp`** only.
+
+| Goal | Command |
+|------|---------|
+| Cross-build ELF | **`make pi-gateway-build-native-hello`** |
+| Sync scripts + **`scp`** + run + **`digest=`** check | **`make pi-gateway-validate-gateway-native GATEWAY=pi@cede-pi.local`** optional **`DIGEST=…`** |
+| Build + validate in one shot | **`make pi-gateway-build-test-gateway-native GATEWAY=pi@cede-pi.local`** |
+
+**Pass:** stdout line **`CEDE hello_gateway ok digest=<id>`** matches **`FIRMWARE_DIGEST`** / **`DIGEST`** (same rules as §3).
+
+### 6. Hardware smoke — unique **`CEDE_TEST_IMAGE_ID`** per run (both MCUs or one)
+
+| Scope | Command |
+|-------|---------|
+| Pico + Uno rebuild + flash + validate | **`make pi-gateway-hello-lab-hardware-smoke GATEWAY=pi@cede-pi.local`** |
+| Uno only | **`make pi-gateway-hello-lab-hardware-smoke-uno GATEWAY=pi@cede-pi.local`** |
+| Pico only | **`make pi-gateway-hello-lab-hardware-smoke-pico GATEWAY=pi@cede-pi.local`** |
+
+Pytest (requires hardware env vars): **`CEDE_RUN_HARDWARE_FULL=1`**, **`CEDE_RUN_HARDWARE_UNO=1`**, **`CEDE_RUN_HARDWARE_PICO=1`** — see **`lab/tests/test_hello_lab_hardware_*.py`**.
+
+### 7. Full staged pipeline (workspace → gateway → Stage 0 → second MCU)
+
+| Goal | Command |
+|------|---------|
+| End-to-end **`bootstrap-pipeline`** | **`make bootstrap-pipeline GATEWAY=pi@cede-pi.local`** (**`ZERO_TARGET=pico`** default) |
+
+### Tier summary (quick reference)
+
 | Tier | Role | Flash / action | Test | Validate (pass) |
 |------|------|----------------|------|------------------|
 | **Workspace** | Dev-Host | *Build* UF2 + HEX (no device) | Config schema; Docker `pico-build` / `uno-build` | Artifacts exist; builds exit 0 |

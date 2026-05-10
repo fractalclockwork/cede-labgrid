@@ -49,7 +49,7 @@ endif
 # On an amd64 host, arm64 Dockerfile RUN steps use QEMU via binfmt — run setup-binfmt once if builds fail.
 # ---------------------------------------------------------------------------
 
-.PHONY: print-host-platform workflow-docker-print workflow-docker-host workflow-emulated-arm64 workflow-emulated-amd64 workflow-emulated-targets workflow-docker-all test-emulated-target emulation-native-test emulation-cross-test emulation-envs-standup-test build-images build-images-host build-images-arm64 build-images-amd64 build-images-cross build-images-all-arch build-rpi-imager build-gateway-images save-gateway-orchestration setup-binfmt smoke pico-build uno-build test-config shell-pico shell-arduino shell-orch shell-rpi-imager pi-bootstrap-render
+.PHONY: print-host-platform workflow-docker-print workflow-docker-host workflow-emulated-arm64 workflow-emulated-amd64 workflow-emulated-targets workflow-docker-all test-emulated-target emulation-native-test emulation-cross-test emulation-envs-standup-test build-images build-images-host build-images-arm64 build-images-amd64 build-images-cross build-images-all-arch build-rpi-imager build-gateway-images save-gateway-orchestration setup-binfmt smoke pico-build uno-build gateway-native-hello-build test-config shell-pico shell-arduino shell-orch shell-rpi-imager pi-bootstrap-render
 
 workflow-docker-print:
 	@echo "CEDE Docker target workflow (compose images)"
@@ -189,7 +189,7 @@ save-gateway-orchestration:
 smoke: build-images
 	$(COMPOSE) run --rm pico-dev bash -lc 'arm-none-eabi-gcc --version && cmake --version && ninja --version && picotool version'
 	$(COMPOSE) run --rm arduino-dev bash -lc 'avr-gcc --version && avrdude -v 2>&1 | head -n 1 && arduino-cli version'
-	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest"'
+	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest" && cc --version | head -n 1'
 
 # Plain Pico by default; Pico W: make pico-build PICO_BOARD=pico_w.
 # Optional: CEDE_IMAGE_ID=abc1234 — embed in USB banner digest= (default: git rev-parse --short=12 in repo).
@@ -211,6 +211,19 @@ uno-build:
 		bash tools/gen_cede_image_id.sh && \
 		mkdir -p build && \
 		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . \
+	'
+
+# aarch64 ELF for Raspberry Pi OS 64-bit gateway (linux/arm64 OCI; qemu/binfmt on amd64 hosts).
+CEDE_IMAGE_ID ?=
+gateway-native-hello-build:
+	@echo "=== gateway hello_gateway (aarch64) in orchestration-dev ==="
+	$(COMPOSE_ARM64) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) orchestration-dev bash -lc '\
+		set -e; \
+		cd /workspace/lab/pi/native/hello_gateway && \
+		chmod +x tools/gen_cede_gateway_digest.sh && \
+		bash tools/gen_cede_gateway_digest.sh && \
+		mkdir -p build && cc -std=c11 -Wall -Wextra -O2 -o build/hello_gateway main.c && \
+		test -x build/hello_gateway && ls -l build/hello_gateway \
 	'
 
 test-config:

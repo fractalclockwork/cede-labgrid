@@ -11,6 +11,8 @@ hosts:
     role: raspberry-pi-gateway
     ssh_host: cede-pi.local
     ssh_user: pi
+    # Sparse flash-deps directory on the Pi (sync_gateway_flash_deps.sh → lab/pi/Makefile + scripts only).
+    # Not a git clone — keep firmware/native binaries on the Dev-Host and scp or gateway-make copy them.
     repo_root: "~/cede"
 
 serial:

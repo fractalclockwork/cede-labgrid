@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Push only the Pi-side files needed for `make -C lab/pi` flash helpers (no firmware, no Docker, no full repo).
-# The destination (default ~/cede) is a sparse directory layout — do not replace it with `git clone`.
+# Push only the Pi-side files needed for `make -C lab/pi` flash helpers (no firmware, no Docker).
+# The gateway must NOT hold a full CEDE git checkout — only this rsync tree (default ~/cede/lab/pi/…).
 #
 # Usage:
 #   ./sync_gateway_flash_deps.sh user@cede-pi.local
@@ -48,6 +48,7 @@ FILES=(
   lab/pi/scripts/pi_resolve_gateway_uno.py
   lab/pi/scripts/pi_validate_uno_serial.py
   lab/pi/scripts/cede_firmware_attest.py
+  lab/pi/scripts/pi_validate_gateway_native.py
   lab/pi/scripts/lab_i2c_matrix_validate.py
 )
 if [[ "${UNO_ONLY:-}" != "1" ]]; then
@@ -68,4 +69,4 @@ rsync -avz \
   "${REMOTE}:${RDIR_RAW}"
 
 echo "==> gateway flash deps synced to ${REMOTE}:${RDIR_RAW}"
-echo "    On the Pi, run scripts from that same path (not a different checkout under ~/cede unless you synced there too)."
+echo "    Pi gateway: sparse tree only — no git clone; firmware and aarch64 hello_gateway are copied from the Dev-Host (scp)."

@@ -76,6 +76,7 @@ def test_sync_gateway_deps_includes_uno_scripts(repo_root: Path) -> None:
         "pi_validate_uno_serial.py",
         "cede_firmware_attest.py",
         "pi_flash_uno_avrdude.sh",
+        "pi_validate_gateway_native.py",
         "lab_i2c_matrix_validate.py",
     ):
         assert name in body, f"sync_gateway_flash_deps.sh should list {name}"

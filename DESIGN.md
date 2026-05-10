@@ -297,7 +297,7 @@ RESP:{"imu":{"ax":0.12,"ay":0.03,"az":9.81}}
 - **Expose at runtime:** The running firmware prints a line that includes **`digest=<id>`** on the USB serial banner (same transport as §8).  
 - **Assert in validation:** Dev‑Host and Pi scripts read the banner and compare **`digest=`** to the **expected** value for that step (Makefile **`DIGEST`**, **`--digest`** on serial validators, and matrix flows that re‑read USB after I2C checks). A mismatch fails fast instead of attributing bus or sensor errors to the wrong binary.
 
-This is **version assurance for the target image**, not cryptographic signing: it ties **observed runtime behavior** to **the intended build identity** for repeatability and regression isolation. Operational detail, smoke targets, and stale‑`DIGEST` caveats live in **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)** and **[lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md)**.
+This is **version assurance for the target image**, not cryptographic signing: it ties **observed runtime behavior** to **the intended build identity** for repeatability and regression isolation. Operational detail, smoke targets, stale‑`DIGEST` caveats, and the **validation command checklist** (workspace, gateway, MCUs, I2C, gateway native, smoke) live in **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)**. Flash/resolve details: **[lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md)**.
 
 ### Test 1 — Dev-Host ↔ Pi SSH  
 - Confirm remote editing and file sync

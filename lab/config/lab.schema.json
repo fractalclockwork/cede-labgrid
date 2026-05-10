@@ -96,7 +96,10 @@
       "required": ["role"],
       "properties": {
         "role": { "type": "string" },
-        "repo_root": { "type": "string" },
+        "repo_root": {
+          "type": "string",
+          "description": "Path on that host: Dev-Host = full repo checkout; Pi gateway = sparse rsync destination for lab/pi only (not a git clone). See lab/pi/scripts/sync_gateway_flash_deps.sh."
+        },
         "ssh_host": { "type": "string" },
         "ssh_user": { "type": "string" }
       }

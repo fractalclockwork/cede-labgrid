@@ -7,7 +7,7 @@ DIGEST ?=
 CEDE_REPO_DIGEST := $(shell git -C $(REPO_ROOT) rev-parse --short=12 HEAD 2>/dev/null)
 FIRMWARE_DIGEST = $(if $(strip $(DIGEST)),$(DIGEST),$(CEDE_REPO_DIGEST))
 
-.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
+.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c pi-gateway-build-native-hello pi-gateway-validate-gateway-native pi-gateway-build-test-gateway-native bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
 
 help:
 	@echo "Python (uv):"
@@ -45,6 +45,9 @@ help:
 	@echo "  make pi-gateway-flash-pico [UF2=path] [PICO_BOOTSEL_ONLY=1] [PICO_WAIT_MOUNT=…] [SKIP_SYNC=1] — cede-rp2 UF2 (default mount poll ≈3s on Pi; raise if desktop needs automount)"
 	@echo "  make pi-gateway-validate-uno [PORT=…] [DIGEST=…] — Uno serial banner + digest= (default: git rev-parse --short=12 HEAD)"
 	@echo "  make pi-gateway-validate-pico [PORT=…] [DIGEST=…] — Pico serial banner + digest= (same default)"
+	@echo "  make pi-gateway-build-native-hello — cross-build lab/pi/native/hello_gateway (aarch64) in Docker"
+	@echo "  make pi-gateway-validate-gateway-native [GATEWAY_NATIVE_BIN=…] [DIGEST=…] — scp binary, ssh run, check digest= stdout"
+	@echo "  make pi-gateway-build-test-gateway-native — build + validate-gateway-native (needs GATEWAY)"
 	@echo "  make pi-gateway-flash-test-uno [PORT=…] — flash then validate Uno"
 	@echo "  make pi-gateway-flash-test-uno-i2c — flash Uno then serial + I2C reg0 @ UNO_I2C_ADDR (default 0x43)"
 	@echo "  make pi-gateway-flash-test-pico [UF2=…] [PICO_BOOTSEL_ONLY=1] — flash then validate cede-rp2"
@@ -65,7 +68,7 @@ help:
 	@echo "  make pi-gateway-hello-lab-hardware-smoke — Docker rebuild hello_lab with unique digest per run, flash Pico+Uno, validate banners (not CI; needs GATEWAY + devices)"
 	@echo "  make pi-gateway-hello-lab-hardware-smoke-uno — same digest flow for Uno only (uno-build + flash-test-uno)"
 	@echo "  make pi-gateway-hello-lab-hardware-smoke-pico — same digest flow for Pico only (pico-build + flash-test-pico)"
-	@echo "  make sync-pi-gateway-flash-deps / pi-gateway-sync — rsync only lab/pi Makefile + flash scripts (no Docker/firmware tree)"
+	@echo "  make sync-pi-gateway-flash-deps / pi-gateway-sync — rsync only lab/pi Makefile + scripts (Pi has no full repo; UF2/HEX/hello_gateway come from Dev-Host scp)"
 	@echo "    Uno-only: UNO_ONLY=1 make pi-gateway-sync GATEWAY=…"
 	@echo "    Pi repo path: omit GATEWAY_REPO_ROOT for ~/cede on Pi; or quote — GATEWAY_REPO_ROOT='~/src/cede' (unquoted ~/… expands to dev-host home in GNU Make)"
 
@@ -134,6 +137,21 @@ pi-gateway-flash-test-pico-i2c:
 	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
 	@$(MAKE) pi-gateway-validate-i2c-pi-to-pico GATEWAY="$(GATEWAY)" I2C_BUS="$(I2C_BUS)" PICO_I2C_ADDR="$(PICO_I2C_ADDR)"
 
+# aarch64 hello_gateway for Raspberry Pi OS 64-bit (see lab/pi/native/hello_gateway; lab/docker/Makefile gateway-native-hello-build).
+# Embed id must match FIRMWARE_DIGEST (git short on host by default). orchestration-dev has no git unless we pass -e CEDE_IMAGE_ID.
+GATEWAY_NATIVE_BIN ?= $(REPO_ROOT)/lab/pi/native/hello_gateway/build/hello_gateway
+# CEDE_IMAGE_ID overrides embed when set; else same token as DIGEST / git short (FIRMWARE_DIGEST).
+GATEWAY_NATIVE_CEDE_IMAGE_ID = $(if $(strip $(CEDE_IMAGE_ID)),$(CEDE_IMAGE_ID),$(FIRMWARE_DIGEST))
+pi-gateway-build-native-hello:
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" gateway-native-hello-build CEDE_IMAGE_ID="$(GATEWAY_NATIVE_CEDE_IMAGE_ID)"
+
+pi-gateway-validate-gateway-native:
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-gateway-native --binary "$(GATEWAY_NATIVE_BIN)" $(if $(strip $(FIRMWARE_DIGEST)),--digest "$(FIRMWARE_DIGEST)",)
+
+pi-gateway-build-test-gateway-native:
+	@$(MAKE) pi-gateway-build-native-hello $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
+	@$(MAKE) pi-gateway-validate-gateway-native GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" GATEWAY_NATIVE_BIN="$(GATEWAY_NATIVE_BIN)" $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
+
 # Optional I2C smoke (hello_lab): Pico @ 0x42, Uno @ 0x43 — both may coexist on bus 1 (lab/docs/staged-bootstrap.md).
 I2C_BUS ?= 1
 PICO_I2C_ADDR ?= 0x42
@@ -183,6 +201,7 @@ bootstrap-stage-dev-host:
 	@$(MAKE) test-config-local
 	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" pico-build
 	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" uno-build
+	@$(MAKE) pi-gateway-build-native-hello
 
 bootstrap-stage-gateway:
 	@$(MAKE) pi-gateway-health GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)"
@@ -287,6 +306,7 @@ container-test-baseline:
 	$(MAKE) -C "$(REPO_ROOT)/lab/docker" smoke
 	$(MAKE) -C "$(REPO_ROOT)/lab/docker" pico-build
 	$(MAKE) -C "$(REPO_ROOT)/lab/docker" uno-build
+	$(MAKE) pi-gateway-build-native-hello
 	$(MAKE) -C "$(REPO_ROOT)/lab/docker" test-config
 	cd "$(REPO_ROOT)" && docker compose -f lab/docker/docker-compose.yml run --rm orchestration-dev bash -lc 'cd /workspace && pytest -q lab/tests/'
 
