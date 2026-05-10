@@ -43,6 +43,18 @@ fi
 
 FILES=(
   lab/pi/Makefile
+  lab/pi/ssd1306_dual/main.py
+  lab/pi/ssd1306_dual/bus_speed_test.py
+  lab/pi/ssd1306_dual/requirements.txt
+  lab/pi/ssd1306_dual/cede_app.yaml
+  lab/pi/ssd1306_dual/README.md
+  lab/pi/ssd1306_eyes/main.py
+  lab/pi/ssd1306_eyes/eyes_anim.py
+  lab/pi/ssd1306_eyes/eyes_draw.py
+  lab/pi/ssd1306_eyes/dirty_stats.py
+  lab/pi/ssd1306_eyes/requirements.txt
+  lab/pi/ssd1306_eyes/cede_app.yaml
+  lab/pi/ssd1306_eyes/README.md
   lab/pi/scripts/health_check.py
   lab/pi/scripts/pi_flash_uno_avrdude.sh
   lab/pi/scripts/pi_resolve_gateway_uno.py

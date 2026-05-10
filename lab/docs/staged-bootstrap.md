@@ -12,13 +12,43 @@ The gateway keeps **only** a **sparse** tree (**`sync_gateway_flash_deps.sh`** �
 
 Use this section as the **operator index** after imaging **cede-pi** and wiring Pico/Uno. Order: **workspace → gateway → MCUs → I2C → (optional) gateway native**. **`GATEWAY`** defaults to **`pi@cede-pi.local`** in root **`Makefile`**; override when needed. **`unset DIGEST`** before smoke targets if your shell still exports an old **`DIGEST=`**.
 
+### Copy-paste: end-to-end bench validation (`hello_lab`)
+
+Run from the **repository root** on the Dev-Host. Requires SSH to **`GATEWAY`**, USB from Pi → Pico and Pi → Uno, and I2C harness per **[bus-wiring.md](../pi/docs/bus-wiring.md)** for the matrix step.
+
+```bash
+export DIG=$(git rev-parse --short=12 HEAD)
+export GATEWAY=pi@cede-pi.local
+export GATEWAY_REPO_ROOT='~/cede'
+
+# Embed digest in firmware — Docker may not see .git; without this, banners can show digest=unknown and flash+validate fails.
+make -C lab/docker pico-build uno-build CEDE_IMAGE_ID="$DIG"
+
+make pi-gateway-health GATEWAY="$GATEWAY"
+make pi-gateway-subtarget-check GATEWAY="$GATEWAY"
+
+make pi-gateway-flash-test-pico GATEWAY="$GATEWAY"
+make pi-gateway-flash-test-uno GATEWAY="$GATEWAY"
+
+make pi-gateway-validate-i2c-from-lab \
+  GATEWAY="$GATEWAY" \
+  GATEWAY_REPO_ROOT="$GATEWAY_REPO_ROOT" \
+  CEDE_LAB_CONFIG="$(pwd)/lab/config/lab.example.yaml"
+```
+
+**Notes:**
+
+- **`GATEWAY_REPO_ROOT`** must be the sparse flash-deps root on the Pi (default **`~/cede`**) so remote **`python3 lab/pi/scripts/…`** paths resolve. Quote **`'~/cede'`** so GNU Make does not expand **`~`** on the Dev-Host.
+- Optional quick bus-only check without the full matrix driver: **`ssh "$GATEWAY" 'sudo i2cget -y 1 0x42 0 b && sudo i2cget -y 1 0x43 0 b'`** (adjust bus **`1`** if your **`linux_bus`** differs).
+- If **`pi-gateway-validate-i2c-from-lab`** exits non-zero despite **`i2cget`** succeeding, see serial-attestation / SSH quirks; USB **`pi-gateway-flash-test-*`** passing above already validates the primary firmware path.
+
 ### 1. Dev-Host workspace (no USB hardware)
 
 | Goal | Command |
 |------|---------|
 | Python deps | **`uv sync`** (repo root) |
 | Config schema | **`make test-config-local`** or **`uv run pytest -q lab/tests/test_config_schema.py`** |
-| Toolchain + **hello_lab** artifacts + **hello_gateway** cross-build | **`make bootstrap-stage-dev-host`** |
+| Toolchain + **hello_lab** artifacts + **hello_gateway** cross-build | **`make bootstrap-stage-dev-host`** (for digest-aligned **`hello_lab`**, run Docker **`pico-build`** / **`uno-build`** with **`CEDE_IMAGE_ID=$(git rev-parse --short=12 HEAD)`** if **`bootstrap-stage-dev-host`** alone produced **`digest=unknown`**) |
 | CI-style container gate (Docker + builds + pytest in **orchestration-dev**) | **`make container-test-baseline`** |
 | Full lab pytest (no hardware) | **`make validate`** |
 
@@ -35,7 +65,7 @@ Use this section as the **operator index** after imaging **cede-pi** and wiring 
 
 ### 3. MCU targets — flash + serial **`digest=`** attestation
 
-Build on Dev-Host first (**`make -C lab/docker pico-build`** / **`uno-build`**) or rely on paths from §1.
+Build on Dev-Host first (**`make -C lab/docker pico-build`** / **`uno-build`**) or rely on paths from §1. Pass **`CEDE_IMAGE_ID=$(git rev-parse --short=12 HEAD)`** into those Docker builds so the UF2/HEX embed the same token the validators expect (see **Copy-paste** above).
 
 | Target | Flash + serial validate (default **digest** = dev-host **git** short) |
 |--------|-----------------------------------------------------------------------|
@@ -51,7 +81,7 @@ Requires **`i2c-tools`** on **cede-pi**, wiring per **[bus-wiring.md](../pi/docs
 
 | Goal | Command |
 |------|---------|
-| All enabled rows from **`lab.yaml`** / **`lab.example.yaml`** | **`make pi-gateway-validate-i2c-from-lab GATEWAY=pi@cede-pi.local`** optional **`CEDE_LAB_CONFIG=…`** **`ONLY_I2C_PAIR=rpi,pico`** |
+| All enabled rows from **`lab.yaml`** / **`lab.example.yaml`** | **`make pi-gateway-validate-i2c-from-lab GATEWAY=pi@cede-pi.local GATEWAY_REPO_ROOT='~/cede' CEDE_LAB_CONFIG="$(pwd)/lab/config/lab.example.yaml"`** — **`GATEWAY_REPO_ROOT`** required so SSH **`cd ~/cede`** resolves **`lab/pi/scripts`** on the Pi |
 | Pi → Pico then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-pico`** (alias **`pi-gateway-validate-pico-i2c`**) |
 | Pi → Uno then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-uno`** (alias **`pi-gateway-validate-uno-i2c`**) |
 | Both addresses + both USB banners | **`make pi-gateway-validate-i2c-both`** |

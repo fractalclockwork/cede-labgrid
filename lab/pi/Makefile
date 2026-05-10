@@ -4,7 +4,7 @@
 #
 REPO_ROOT := $(abspath ../..)
 
-.PHONY: help subtarget-check resolve-uno-port resolve-pico-port validate-uno-serial validate-pico-serial flash-pico-uf2 flash-pico-auto flash-pico flash-uno print-serial
+.PHONY: help subtarget-check resolve-uno-port resolve-pico-port validate-uno-serial validate-pico-serial flash-pico-uf2 flash-pico-auto flash-pico flash-uno print-serial ssd1306-dual-install ssd1306-dual-run ssd1306-dual-bus-speed ssd1306-eyes-install ssd1306-eyes-run
 
 help:
 	@echo "Pi gateway sub-targets (run on Pi; sparse flash-deps root e.g. ~/cede — see sync_gateway_flash_deps.sh):"
@@ -18,7 +18,11 @@ help:
 	@echo "  make -C lab/pi flash-pico UF2=path        — same as flash-pico-auto"
 	@echo "  make -C lab/pi flash-pico-uf2 UF2=path   — copy UF2 only (BOOTSEL RPI-RP2 already mounted)"
 	@echo "  make -C lab/pi flash-uno HEX=path PORT=/dev/ttyACM0 — avrdude flash"
-	@echo "See lab/pi/docs/pico-uno-subtargets.md"
+	@echo "  make -C lab/pi ssd1306-dual-install — pip install luma.oled for dual OLED demo"
+	@echo "  make -C lab/pi ssd1306-dual-run — run lab/pi/ssd1306_dual/main.py (Ctrl+C stops)"
+	@echo "  make -C lab/pi ssd1306-dual-bus-speed [SSD1306_SPEED_DURATION=15] — dual-panel I2C throughput benchmark"
+	@echo "  make -C lab/pi ssd1306-eyes-install / ssd1306-eyes-run — dual cartoon-eye animation (lab/pi/ssd1306_eyes)"
+	@echo "See lab/pi/docs/pico-uno-subtargets.md, lab/pi/ssd1306_dual/README.md, lab/pi/ssd1306_eyes/README.md"
 
 subtarget-check:
 	cd "$(REPO_ROOT)" && python3 lab/pi/scripts/health_check.py
@@ -60,3 +64,37 @@ flash-uno:
 	@test -n "$(HEX)" || (echo "Set HEX=/path/to/file.hex" >&2; exit 1)
 	@test -n "$(PORT)" || (echo "Set PORT=/dev/ttyACM0 (or correct Uno port)" >&2; exit 1)
 	@bash "$(REPO_ROOT)/lab/pi/scripts/pi_flash_uno_avrdude.sh" --hex "$(HEX)" --port "$(PORT)" --yes
+
+ssd1306-dual-install:
+	@test -d "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv" || python3 -m venv "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv"
+	@"$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv/bin/pip" install -r "$(REPO_ROOT)/lab/pi/ssd1306_dual/requirements.txt"
+
+ssd1306-dual-run:
+	@if test -x "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv/bin/python"; then \
+	  "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv/bin/python" "$(REPO_ROOT)/lab/pi/ssd1306_dual/main.py"; \
+	else \
+	  python3 "$(REPO_ROOT)/lab/pi/ssd1306_dual/main.py"; \
+	fi
+
+# Throughput benchmark (full-frame updates on both SSD1306). Override duration: SSD1306_SPEED_DURATION=20
+SSD1306_SPEED_DURATION ?= 10
+ssd1306-dual-bus-speed:
+	@if test -x "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv/bin/python"; then \
+	  "$(REPO_ROOT)/lab/pi/ssd1306_dual/.venv/bin/python" "$(REPO_ROOT)/lab/pi/ssd1306_dual/bus_speed_test.py" --duration "$(SSD1306_SPEED_DURATION)"; \
+	else \
+	  python3 "$(REPO_ROOT)/lab/pi/ssd1306_dual/bus_speed_test.py" --duration "$(SSD1306_SPEED_DURATION)"; \
+	fi
+
+ssd1306-eyes-install:
+	@test -d "$(REPO_ROOT)/lab/pi/ssd1306_eyes/.venv" || python3 -m venv "$(REPO_ROOT)/lab/pi/ssd1306_eyes/.venv"
+	@"$(REPO_ROOT)/lab/pi/ssd1306_eyes/.venv/bin/pip" install -r "$(REPO_ROOT)/lab/pi/ssd1306_eyes/requirements.txt"
+
+# Optional extra CLI flags, e.g. SSD1306_EYES_EXTRA_ARGS='--contrast-left 220 --contrast-right 255'
+SSD1306_EYES_EXTRA_ARGS ?=
+
+ssd1306-eyes-run:
+	@if test -x "$(REPO_ROOT)/lab/pi/ssd1306_eyes/.venv/bin/python"; then \
+	  "$(REPO_ROOT)/lab/pi/ssd1306_eyes/.venv/bin/python" "$(REPO_ROOT)/lab/pi/ssd1306_eyes/main.py" $(SSD1306_EYES_EXTRA_ARGS); \
+	else \
+	  python3 "$(REPO_ROOT)/lab/pi/ssd1306_eyes/main.py" $(SSD1306_EYES_EXTRA_ARGS); \
+	fi

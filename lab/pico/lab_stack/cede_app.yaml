@@ -1,0 +1,14 @@
+# Per-application manifest (v0): gateway/dev-host discovery — not schema-validated alone.
+application_id: lab_stack
+target: pico
+requires:
+  lab_paths:
+    build_key: lab_stack_pico_build
+    artifact_glob_key: lab_stack_pico_uf2_glob
+resources:
+  usb_serial:
+    banner_prefix: "CEDE lab_stack rp2 ok"
+  i2c_slave:
+    address: 0x42
+    registers:
+      0: { kind: status, expect_boot_magic: 0xCE }

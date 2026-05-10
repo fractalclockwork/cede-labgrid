@@ -80,6 +80,8 @@ This remains the baseline for flashing and serial validators.
 
 From **cede-pi**: `sudo i2cdetect -y 1` should show **`42`** and **`43`** when both targets run current `hello_lab`.
 
+**Optional SSD1306 OLEDs** on the same Pi I2C bus use different addresses (typically **`3c`** and **`3d`** with an ADDR jumper). They do not collide with **`0x42`** / **`0x43`**. See [lab/pi/ssd1306_dual/README.md](../ssd1306_dual/README.md).
+
 ### I2C matrix tests (Pi → each MCU)
 
 **Single bring-up path:** declare **`i2c_matrix.pairs[].validation`** in **`lab/config/lab.yaml`** (or copy from **`lab.example.yaml`**). Each enabled row uses **`mode: rpi_master_i2cdev_read`** with **`controller: rpi`** so the **Raspberry Pi** drives **SCL** and reads the target (**`i2cget`**) at **`probe_address`**. That is enough to validate the shared bus and level shifting to each MCU; dedicated Pico↔Uno USB-triggered matrix rows were removed as redundant with Pi→Pico and Pi→Uno checks.
@@ -100,6 +102,8 @@ Flash + Pi-side I2C for a **single** target: **`make pi-gateway-flash-test-pico-
 Optional Pi-only smoke (both addresses from the Pi): **`make pi-gateway-validate-i2c-both`**.
 
 **Troubleshooting Pi→Uno:** If **0x43** *Read failed*, reflash Uno (**`make pi-gateway-flash-test-uno-i2c`**) and check **A4/A5** / HV shifter. **`make pi-gateway-diagnose-i2c`** should show **43** in the grid.
+
+**Intermittent Uno / flaky `i2cdetect`:** The Raspberry Pi **broadcom** I2C master can **time out** if a slave **holds SCL low** (clock stretching) longer than the controller allows. The Arduino **Uno** TWI ISR shares CPU time with **UART** (USB serial): noisy **`hello_lab`** banners increased UART interrupts and made **0x43** drop off scans intermittently. Firmware **throttles** the periodic digest banner; **D13** blinks from a **Timer1 ISR** (not **`loop()`**) so **`loop()`** stays Serial / banners only and **`Wire`** sees less contention with **`delay()`**. On the Pi you can also slow the bus for margin, e.g. in **`/boot/firmware/config.txt`** set **`dtparam=i2c_arm_baudrate=50000`** (default is often **100000**) and reboot. With **SSD1306** or other chatty devices on the same bus, pause OLED demos during **`i2cdetect`** / **`i2cget`** checks so SDA/SCL are not contested during refresh.
 
 ## 4) SPI pin-to-pin wiring
 

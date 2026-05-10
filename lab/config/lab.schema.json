@@ -55,7 +55,42 @@
         "uno_build": { "type": "string" },
         "uno_hex_glob": { "type": "string" },
         "logs_dir": { "type": "string" },
-        "test_results_dir": { "type": "string" }
+        "test_results_dir": { "type": "string" },
+        "lab_stack_pico_build": { "type": "string" },
+        "lab_stack_pico_uf2_glob": { "type": "string" },
+        "lab_stack_uno_build": { "type": "string" },
+        "lab_stack_uno_hex_glob": { "type": "string" },
+        "ssd1306_dual_pi_app": {
+          "type": "string",
+          "description": "Pi gateway application tree (Python) for ssd1306_dual."
+        },
+        "ssd1306_dual_pi_main_glob": {
+          "type": "string",
+          "description": "Glob for the Pi app entrypoint under ssd1306_dual_pi_app (e.g. main.py)."
+        },
+        "ssd1306_eyes_pi_app": {
+          "type": "string",
+          "description": "Pi gateway application tree (Python) for ssd1306_eyes."
+        },
+        "ssd1306_eyes_pi_main_glob": {
+          "type": "string",
+          "description": "Glob for the Pi app entrypoint under ssd1306_eyes_pi_app (e.g. main.py)."
+        }
+      }
+    },
+    "applications": {
+      "type": "object",
+      "description": "Maps application_id to path keys under paths.* for multi-target firmware products.",
+      "additionalProperties": { "$ref": "#/$defs/applicationEntry" }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional metadata keyed by pi/pico/uno; compose with existing paths.* and serial.devices.* (no parallel rename).",
+      "properties": {
+        "pico": { "$ref": "#/$defs/targetMcu" },
+        "uno": { "$ref": "#/$defs/targetMcu" },
+        "pi": { "$ref": "#/$defs/targetGateway" }
       }
     },
     "i2c_matrix": {
@@ -115,6 +150,72 @@
           "items": { "type": "string" },
           "minItems": 1
         }
+      }
+    },
+    "applicationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets"],
+      "properties": {
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pico": { "$ref": "#/$defs/applicationTargetPaths" },
+            "uno": { "$ref": "#/$defs/applicationTargetPaths" },
+            "pi": { "$ref": "#/$defs/applicationTargetPaths" }
+          }
+        }
+      }
+    },
+    "applicationTargetPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths_build_key", "paths_artifact_glob_key"],
+      "properties": {
+        "paths_build_key": { "type": "string", "minLength": 1 },
+        "paths_artifact_glob_key": { "type": "string", "minLength": 1 }
+      }
+    },
+    "targetMcu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "paths", "serial_devices_key"],
+      "properties": {
+        "kind": { "const": "mcu" },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["build_key", "artifact_glob_key"],
+          "properties": {
+            "build_key": {
+              "type": "string",
+              "enum": ["pico_build", "uno_build", "lab_stack_pico_build", "lab_stack_uno_build"]
+            },
+            "artifact_glob_key": {
+              "type": "string",
+              "enum": ["pico_uf2_glob", "uno_hex_glob", "lab_stack_pico_uf2_glob", "lab_stack_uno_hex_glob"]
+            }
+          }
+        },
+        "serial_devices_key": {
+          "type": "string",
+          "enum": ["pico", "uno"]
+        }
+      }
+    },
+    "targetGateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "gateway" },
+        "hosts_key": {
+          "type": "string",
+          "const": "pi",
+          "description": "Reference entry under hosts for the Raspberry Pi gateway."
+        },
+        "notes": { "type": "string" }
       }
     },
     "i2cPairValidation": {

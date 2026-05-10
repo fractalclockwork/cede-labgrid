@@ -2,11 +2,17 @@
 
 Use this runbook **after** gateway bootstrapping has passed its **E2E** checks (patched `.img`, verify, flash, SSH). Pico/Uno flashing assumes a sane Pi OS gateway and a working **`ssh`** session — not half-repaired cloud-init.
 
+**Applications (multi-target firmware):** **[lab/docs/applications.md](../../docs/applications.md)** — e.g. **`lab_stack`**, **`cede_app.yaml`**, **`make pi-gateway-flash-test-pico-lab-stack`**. **Deploy E2E:** [deploy-lab-stack-app.md](../../docs/deploy-lab-stack-app.md).
+
+**Development preflight (goal-driven gate):** **[lab/docs/dev-preflight.md](../../docs/dev-preflight.md)** — **`make cede-dev-preflight`** chains workspace toolchains + gateway health + subtarget checks before feature work.
+
+**Repeatable E2E (build, flash Pico + Uno, USB validate, I2C):** **[lab/docs/staged-bootstrap.md](../../docs/staged-bootstrap.md)** — section *Copy-paste: end-to-end bench validation (`hello_lab`)* — includes **`CEDE_IMAGE_ID`** for Docker and **`GATEWAY_REPO_ROOT`** for **`pi-gateway-validate-i2c-from-lab`**.
+
 **Staged bootstrap:** **[lab/docs/staged-bootstrap.md](../../docs/staged-bootstrap.md)** — operator **validation command checklist** (workspace → gateway → MCUs → I2C → gateway native → smoke). **Stage 0** is **flash + unique firmware attestation** (`make bootstrap-stage-zero`); workspace build and gateway health are separate gates (`make bootstrap-stage-dev-host`, `make bootstrap-stage-gateway`).
 
 **Gateway layout:** do **not** install a **`git clone`** of CEDE on the Pi. Dev-Host pushes only [**`sync_gateway_flash_deps.sh`**](../scripts/sync_gateway_flash_deps.sh) artifacts (**`lab/pi/Makefile`**, **`lab/pi/scripts/*.py|.sh`**) into a **sparse** directory (default **`~/cede`**). Treat **`GATEWAY_REPO_ROOT`** as that flash-deps root, not a full repository.
 
-**Bus wiring reference:** [bus-wiring.md](bus-wiring.md) is the canonical no-rewire harness specification for USB baseline + I2C + SPI across Pi/Pico/Uno.
+**Bus wiring reference:** [bus-wiring.md](bus-wiring.md) is the canonical no-rewire harness specification for USB baseline + I2C across Pi/Pico/Uno (SPI notes are hardware reference only, not a shared lab milestone).
 
 **Order:** finish the **[Gateway E2E verification gate](rpi3-gateway-remote.md#gateway-e2e-verification-gate)** (`make validate`, **`make pi-gateway-sd-ready`**, **`pi-gateway-verify-boot`**, bench flash, then **`ping`** + **`ssh`**). Fix wrong **`user-data`**, missing keys, or sudo policy by **remounting the SD or loop-mounting the `.img`** and re-running **`prepare_sdcard_boot.sh`** / **`patch-image`** ([cli-flash.md](cli-flash.md)); do not chase bring-up bugs by editing `/etc` on the live Pi from this workflow.
 

@@ -49,7 +49,7 @@ endif
 # On an amd64 host, arm64 Dockerfile RUN steps use QEMU via binfmt — run setup-binfmt once if builds fail.
 # ---------------------------------------------------------------------------
 
-.PHONY: print-host-platform workflow-docker-print workflow-docker-host workflow-emulated-arm64 workflow-emulated-amd64 workflow-emulated-targets workflow-docker-all test-emulated-target emulation-native-test emulation-cross-test emulation-envs-standup-test build-images build-images-host build-images-arm64 build-images-amd64 build-images-cross build-images-all-arch build-rpi-imager build-gateway-images save-gateway-orchestration setup-binfmt smoke pico-build uno-build gateway-native-hello-build test-config shell-pico shell-arduino shell-orch shell-rpi-imager pi-bootstrap-render
+.PHONY: print-host-platform workflow-docker-print workflow-docker-host workflow-emulated-arm64 workflow-emulated-amd64 workflow-emulated-targets workflow-docker-all test-emulated-target emulation-native-test emulation-cross-test emulation-envs-standup-test build-images build-images-host build-images-arm64 build-images-amd64 build-images-cross build-images-all-arch build-rpi-imager build-gateway-images save-gateway-orchestration setup-binfmt smoke pico-build uno-build pico-build-lab-stack uno-build-lab-stack gateway-native-hello-build test-config shell-pico shell-arduino shell-orch shell-rpi-imager pi-bootstrap-render
 
 workflow-docker-print:
 	@echo "CEDE Docker target workflow (compose images)"
@@ -192,13 +192,16 @@ smoke: build-images
 	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest" && cc --version | head -n 1'
 
 # Plain Pico by default; Pico W: make pico-build PICO_BOARD=pico_w.
+# PICO_APP / UNO_APP — sketch/project directory under lab/pico / lab/uno (default hello_lab). Example: make pico-build PICO_APP=lab_stack
 # Optional: CEDE_IMAGE_ID=abc1234 — embed in USB banner digest= (default: git rev-parse --short=12 in repo).
 PICO_BOARD ?= pico
+PICO_APP ?= hello_lab
+UNO_APP ?= hello_lab
 CEDE_IMAGE_ID ?=
 pico-build:
 	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) pico-dev bash -lc '\
 		set -e; \
-		cd /workspace/lab/pico/hello_lab && \
+		cd /workspace/lab/pico/$(PICO_APP) && \
 		rm -rf build && mkdir build && cd build && \
 		cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=$(PICO_BOARD) .. && \
 		ninja \
@@ -207,11 +210,19 @@ pico-build:
 uno-build:
 	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) arduino-dev bash -lc '\
 		set -e; \
-		cd /workspace/lab/uno/hello_lab && \
+		cd /workspace/lab/uno/$(UNO_APP) && \
 		bash tools/gen_cede_image_id.sh && \
 		mkdir -p build && \
 		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . \
 	'
+
+# Convenience: second reference application (see lab/docs/applications.md).
+.PHONY: pico-build-lab-stack uno-build-lab-stack
+pico-build-lab-stack:
+	@$(MAKE) pico-build PICO_APP=lab_stack
+
+uno-build-lab-stack:
+	@$(MAKE) uno-build UNO_APP=lab_stack
 
 # aarch64 ELF for Raspberry Pi OS 64-bit gateway (linux/arm64 OCI; qemu/binfmt on amd64 hosts).
 CEDE_IMAGE_ID ?=
