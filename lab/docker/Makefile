@@ -192,9 +192,11 @@ smoke: build-images
 	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest"'
 
 # Plain Pico by default; Pico W: make pico-build PICO_BOARD=pico_w.
+# Optional: CEDE_IMAGE_ID=abc1234 — embed in USB banner digest= (default: git rev-parse --short=12 in repo).
 PICO_BOARD ?= pico
+CEDE_IMAGE_ID ?=
 pico-build:
-	$(COMPOSE) run --rm pico-dev bash -lc '\
+	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) pico-dev bash -lc '\
 		set -e; \
 		cd /workspace/lab/pico/hello_lab && \
 		rm -rf build && mkdir build && cd build && \
@@ -203,9 +205,10 @@ pico-build:
 	'
 
 uno-build:
-	$(COMPOSE) run --rm arduino-dev bash -lc '\
+	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) arduino-dev bash -lc '\
 		set -e; \
 		cd /workspace/lab/uno/hello_lab && \
+		bash tools/gen_cede_image_id.sh && \
 		mkdir -p build && \
 		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . \
 	'

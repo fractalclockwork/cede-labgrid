@@ -66,7 +66,11 @@ Desktop.ini
 .tmp/
 .tmp.*
 *.tmp
+tmp/
 
 # Optional: local Docker Compose overrides (machine-specific binds)
 /docker-compose.override.yml
 **/docker-compose.override.yml
+
+# Agent
+.cursor/

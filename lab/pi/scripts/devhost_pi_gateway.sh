@@ -12,12 +12,12 @@
 #   lab/pi/scripts/devhost_pi_gateway.sh flash-uno --hex … [--port …]
 #   lab/pi/scripts/devhost_pi_gateway.sh flash-pico --uf2 … [--bootsel-only] [--no-sync]
 #   PICO_WAIT_MOUNT — optional seconds for RPI-RP2 mount poll (passed to Pi make flash-pico-auto)
-#   lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial | validate-pico-serial [--port …]
+#   lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial | validate-pico-serial [--port …] [--digest GITSHORT]
 
 set -euo pipefail
 
 usage() {
-  sed -n '1,14p' "$0"
+  sed -n '1,18p' "$0"
   exit "${1:-0}"
 }
 
@@ -101,6 +101,7 @@ cmd_validate_uno_serial() {
       --port) port="${2:?}"; shift 2 ;;
       --expect) extra_args+=(--expect "${2:?}"); shift 2 ;;
       --wait) extra_args+=(--wait "${2:?}"); shift 2 ;;
+      --digest) extra_args+=(--digest "${2:?}"); shift 2 ;;
       -h|--help) usage 0 ;;
       *) echo "unknown arg: $1" >&2; usage 1 ;;
     esac
@@ -168,6 +169,7 @@ cmd_validate_pico_serial() {
       --port) port="${2:?}"; shift 2 ;;
       --expect) extra_args+=(--expect "${2:?}"); shift 2 ;;
       --wait) extra_args+=(--wait "${2:?}"); shift 2 ;;
+      --digest) extra_args+=(--digest "${2:?}"); shift 2 ;;
       -h|--help) usage 0 ;;
       *) echo "unknown arg: $1" >&2; usage 1 ;;
     esac

@@ -47,6 +47,8 @@ FILES=(
   lab/pi/scripts/pi_flash_uno_avrdude.sh
   lab/pi/scripts/pi_resolve_gateway_uno.py
   lab/pi/scripts/pi_validate_uno_serial.py
+  lab/pi/scripts/cede_firmware_attest.py
+  lab/pi/scripts/lab_i2c_matrix_validate.py
 )
 if [[ "${UNO_ONLY:-}" != "1" ]]; then
   FILES+=(

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Open the Uno USB-serial device and confirm a banner line after reset. Run ON the gateway Pi."""
+"""Open the Uno USB-serial device and confirm a banner line after reset. Run ON the gateway Pi.
+
+On success prints expected-digest: and digest-banner: (hello_lab line containing digest=) before the full capture.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +14,8 @@ import subprocess
 import sys
 import termios
 import time
+
+from cede_firmware_attest import attestation_failure_reason, digest_banner_line, expected_digest_value
 
 
 def _read_with_pyserial(port: str, baud: int, wait: float, expect_b: bytes) -> bytes:
@@ -105,6 +110,11 @@ def main() -> int:
     )
     p.add_argument("--baud", type=int, default=115200)
     p.add_argument("--wait", type=float, default=3.0, help="seconds to wait")
+    p.add_argument(
+        "--digest",
+        default="",
+        help="require digest=<value> to match (else CEDE_EXPECT_DIGEST env); banner must always include digest=",
+    )
     args = p.parse_args()
 
     expect_b = args.expect.encode("utf-8")
@@ -127,6 +137,16 @@ def main() -> int:
 
     text = buf.decode("utf-8", errors="replace")
     if expect_b in buf:
+        want = expected_digest_value(args.digest)
+        why = attestation_failure_reason(buf, "uno", want)
+        if why:
+            print(f"validate: fail ({why})", file=sys.stderr)
+            print(text.strip(), file=sys.stderr)
+            return 3
+        print(f"expected-digest: {want if want else '(any digest= token)'}")
+        bline = digest_banner_line(buf, "uno")
+        if bline:
+            print(f"digest-banner: {bline}")
         print("validate: ok (serial banner present)")
         print(text.strip())
         return 0

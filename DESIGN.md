@@ -243,11 +243,11 @@ flowchart TD
 
 - USB host for MCUs  
 - Optional direct I2C/SPI for Pi‑native sensors  
-- **Hello Lab (§9):** the Pi’s I2C controllers may act as an initiator or target in the **RPi / Pico / Uno** test matrix alongside USB serial programming  
+- **Hello Lab (§9):** the Pi’s I2C controller acts as **master** to each MCU (**Pi → Pico**, **Pi → Uno**) on the shared harness, alongside USB serial programming  
 
 ### 7.4 Inter‑tier I2C (Hello Lab)
 
-- Bring‑up validates I2C **between** the gateway and MCUs (and MCU↔MCU if wired), not only sensors on a single board.  
+- Bring‑up validates I2C **from the gateway to each MCU** (Pi as master), not only sensors on a single board.  
 - **3.3 V vs 5 V:** pairs that require **level shifting** or are **electrically unsafe** are marked **N/A** in lab config; the test suite runs only **enabled** matrix cells.  
 - **Sensors** on those buses are a **post–bring-up** concern (§9 scope).  
 
@@ -283,9 +283,21 @@ RESP:{"imu":{"ax":0.12,"ay":0.03,"az":9.81}}
 
 ## 9. Bring‑Up Test Plan (“Hello Lab”)
 
-**Scope:** “Hello Lab” proves the **Raspberry Pi** can **program** the Pico and Uno, carry a **serial data path** to each MCU, and exercise **I2C** between the **RPi, Pico, and Uno** for the **full matrix of supported sources and endpoints** (initiator/target roles and wiring as defined in lab config and pinout docs). **Physical sensors** (IMU, rangefinders, etc.) are **out of scope** for Hello Lab—they belong to a **post–bring-up sensor integration** phase after the bus and endpoints are trusted.
+**Scope:** “Hello Lab” proves the **Raspberry Pi** can **program** the Pico and Uno, carry a **serial data path** to each MCU, and exercise **I2C** from the **Pi as master** to **each** MCU on the shared harness (addresses and wiring per lab config and [`lab/pi/docs/bus-wiring.md`](lab/pi/docs/bus-wiring.md)). **Physical sensors** (IMU, rangefinders, etc.) are **out of scope** for Hello Lab—they belong to a **post–bring-up sensor integration** phase after the bus and endpoints are trusted.
 
 **Out of scope (post bring-up):** Attaching and validating real sensor chips and drivers; dashboards; long‑term logging. Those build on the same contracts once Hello Lab passes.
+
+### 9.1 Target firmware identity — `digest=` on the USB serial banner
+
+**Purpose:** Hello Lab firmware on each MCU prints a **stable, machine‑readable identity** on its USB CDC serial line (alongside the human‑readable “hello” status). The **`digest=<id>`** field exists so automated gates can **prove the device under test is running the specific firmware artifact** the pipeline just built or flashed—not an older UF2/HEX left on disk, a partial flash, or a board that never rebooted into the new image.
+
+**Contract (conceptual):**
+
+- **Embed at build time:** `<id>` is derived from the repository (e.g. short git hash) or from an explicit **`CEDE_IMAGE_ID`** / smoke **`CEDE_TEST_IMAGE_ID`** so each CI or bench run can request a **unique** token when needed.  
+- **Expose at runtime:** The running firmware prints a line that includes **`digest=<id>`** on the USB serial banner (same transport as §8).  
+- **Assert in validation:** Dev‑Host and Pi scripts read the banner and compare **`digest=`** to the **expected** value for that step (Makefile **`DIGEST`**, **`--digest`** on serial validators, and matrix flows that re‑read USB after I2C checks). A mismatch fails fast instead of attributing bus or sensor errors to the wrong binary.
+
+This is **version assurance for the target image**, not cryptographic signing: it ties **observed runtime behavior** to **the intended build identity** for repeatability and regression isolation. Operational detail, smoke targets, and stale‑`DIGEST` caveats live in **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)** and **[lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md)**.
 
 ### Test 1 — Dev-Host ↔ Pi SSH  
 - Confirm remote editing and file sync
@@ -303,17 +315,17 @@ RESP:{"imu":{"ax":0.12,"ay":0.03,"az":9.81}}
 - *Reference tooling:* Makefile **`make pi-gateway-flash-test-uno`** (Dev-Host **`ssh`** to gateway: minimal **`lab/pi`** sync, HEX transfer, **`avrdude` verify**, optional serial banner probe); offline **`pytest lab/tests/test_uno_gateway_env.py`** mocks resolver logic. Pytest **`test_flash_uno_from_pi`** remains a hardware scaffold until Pi‑hosted automation is wired.  
 
 ### Test 5 — RPi ↔ Pico Serial (Data Path)  
-- With known-good firmware, open USB serial and validate **round‑trip** line or framed messages  
+- With firmware whose identity is confirmed (**§9.1** **`digest=`** attestation), open USB serial and validate **round‑trip** line or framed messages  
 - Confirms data plane between Pi and Pico  
 
 ### Test 6 — RPi ↔ Uno Serial (Data Path)  
-- Same for the Uno: round‑trip on the configured serial device  
-- Confirms data plane between Pi and Uno (**`hello_lab.ino`** currently prints **`CEDE hello_lab ok`** @ 115 200 baud for scripted checks alongside Test 4 tooling)  
+- Same for the Uno: round‑trip on the configured serial device, again after **§9.1** attestation so the serial path is exercised on the **intended** image  
+- Confirms data plane between Pi and Uno (**`hello_lab.ino`** prints **`CEDE hello_lab ok`** with **`digest=<id>`** @ 115 200 baud for scripted checks alongside Test 4 tooling)  
 
-### Test 7 — I2C Matrix (RPi, Pico, Uno)  
-- For each **enabled** (source, endpoint) pair in the lab’s I2C plan—e.g. which device may act as **controller** (master) and which as **target** (slave) on a shared or linked bus—run a small **request/ack** or **register peek** test  
-- Cover the **entire matrix** of allowed initiators and targets (RPi↔Pico, RPi↔Uno, Pico↔Uno, and any bus segments the hardware provides), skipping pairs marked **N/A** in config (e.g. not wired, or requires hardware not present)  
-- **Level shifting** and **common ground** between 3.3 V and 5 V domains are assumed per the lab’s wiring document; tests assert behavior, not board safety—designate unsafe pairs as N/A in config  
+### Test 7 — I2C matrix (Pi → Pico, Pi → Uno)  
+- For each **enabled** row in the lab’s **`i2c_matrix`** where the **Raspberry Pi** is **I2C master** (`rpi_master_i2cdev_read`), run a **register peek** (e.g. **`i2cget`**) on the configured bus and **7‑bit address**, then (where configured) confirm the matching MCU’s **USB serial banner** and **`digest=`** so the live image matches the expected firmware  
+- **Pico↔Uno** as **I2C master** over the harness is **out of scope** for the automated matrix; **Pi → each MCU** already validates the shared bus and level shifting. Optional manual **`m`** probes in **hello_lab** firmware remain for bench use only  
+- **Level shifting** and **common ground** between 3.3 V and 5 V domains are assumed per the lab’s wiring document ([`lab/pi/docs/bus-wiring.md`](lab/pi/docs/bus-wiring.md)); tests assert behavior, not board safety—mark unwired or unsafe pairs **N/A** in config  
 
 ---
 

@@ -1,4 +1,8 @@
-"""Scaffold for Hello Lab Tests 3–7 (hardware/Pi); skipped until wired."""
+"""Scaffold for Hello Lab Tests 3–7 (hardware/Pi); most remain stubs.
+
+Full build+flash+unique-digest validation: ``CEDE_RUN_HARDWARE_FULL=1`` and
+``lab/tests/test_hello_lab_hardware_full.py`` or ``make pi-gateway-hello-lab-hardware-smoke``.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +38,7 @@ def test_serial_uno_echo() -> None:
 @pytest.mark.hardware
 @pytest.mark.pi_gateway
 def test_i2c_matrix_enabled_pairs() -> None:
-    pytest.skip("Iterate enabled i2c_matrix pairs from lab config (DESIGN §9 Test 7)")
+    pytest.skip("Use make pi-gateway-validate-i2c-from-lab or CEDE_RUN_HARDWARE_FULL + test_hello_lab_hardware_full")
 
 
 def test_ci_has_no_hardware_marker_by_default() -> None:

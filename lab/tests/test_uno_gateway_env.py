@@ -64,12 +64,20 @@ def test_uno_hello_lab_sketch_has_serial_banner(repo_root: Path) -> None:
     text = path.read_text(encoding="utf-8")
     assert "Serial.begin(115200)" in text
     assert "CEDE hello_lab ok" in text
+    assert "digest=" in text
+    assert "CEDE i2c uno_to_pico ok" in text
 
 
 def test_sync_gateway_deps_includes_uno_scripts(repo_root: Path) -> None:
     script = repo_root / "lab" / "pi" / "scripts" / "sync_gateway_flash_deps.sh"
     body = script.read_text(encoding="utf-8")
-    for name in ("pi_resolve_gateway_uno.py", "pi_validate_uno_serial.py", "pi_flash_uno_avrdude.sh"):
+    for name in (
+        "pi_resolve_gateway_uno.py",
+        "pi_validate_uno_serial.py",
+        "cede_firmware_attest.py",
+        "pi_flash_uno_avrdude.sh",
+        "lab_i2c_matrix_validate.py",
+    ):
         assert name in body, f"sync_gateway_flash_deps.sh should list {name}"
 
 

@@ -1,7 +1,13 @@
 # Repository root — Python tooling via uv (https://docs.astral.sh/uv/)
 REPO_ROOT := $(abspath .)
+# hello_lab serial attestation: default digest from dev-host git; override with DIGEST=… (see lab/docs/staged-bootstrap.md).
+# FIRMWARE_DIGEST uses = (recursive) so it tracks DIGEST when sub-makes pass a fresh DIGEST= after uno-build
+# (:= would freeze a stale shell-exported DIGEST at parse time and mismatch CEDE_TEST_IMAGE_ID in smoke targets).
+DIGEST ?=
+CEDE_REPO_DIGEST := $(shell git -C $(REPO_ROOT) rev-parse --short=12 HEAD 2>/dev/null)
+FIRMWARE_DIGEST = $(if $(strip $(DIGEST)),$(DIGEST),$(CEDE_REPO_DIGEST))
 
-.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-flash-test-uno pi-gateway-flash-test-pico test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
+.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
 
 help:
 	@echo "Python (uv):"
@@ -37,16 +43,36 @@ help:
 	@echo "  make pi-gateway-resolve-port-pico — print cede-rp2 (Pico) tty on the gateway"
 	@echo "  make pi-gateway-flash-uno [PORT=/dev/tty…] [HEX=path] [SKIP_SYNC=1] — PORT omitted: gateway resolves"
 	@echo "  make pi-gateway-flash-pico [UF2=path] [PICO_BOOTSEL_ONLY=1] [PICO_WAIT_MOUNT=…] [SKIP_SYNC=1] — cede-rp2 UF2 (default mount poll ≈3s on Pi; raise if desktop needs automount)"
-	@echo "  make pi-gateway-validate-uno [PORT=…] [SKIP_SYNC=1] [UNO_VALIDATE_WAIT=8] — Uno serial banner"
-	@echo "  make pi-gateway-validate-pico [PORT=…] [SKIP_SYNC=1] [PICO_VALIDATE_WAIT=3] — cede-rp2 serial banner (override if slow USB)"
+	@echo "  make pi-gateway-validate-uno [PORT=…] [DIGEST=…] — Uno serial banner + digest= (default: git rev-parse --short=12 HEAD)"
+	@echo "  make pi-gateway-validate-pico [PORT=…] [DIGEST=…] — Pico serial banner + digest= (same default)"
 	@echo "  make pi-gateway-flash-test-uno [PORT=…] — flash then validate Uno"
+	@echo "  make pi-gateway-flash-test-uno-i2c — flash Uno then serial + I2C reg0 @ UNO_I2C_ADDR (default 0x43)"
 	@echo "  make pi-gateway-flash-test-pico [UF2=…] [PICO_BOOTSEL_ONLY=1] — flash then validate cede-rp2"
+	@echo "  make pi-gateway-flash-test-pico-i2c — flash Pico then serial + Pi→Pico i2cget (same target)"
+	@echo "  I2C matrix (lab/pi/docs/bus-wiring.md; pair.validation in lab.yaml is source of truth):"
+	@echo "    make pi-gateway-validate-i2c-from-lab — run all enabled rows (CEDE_LAB_CONFIG or lab/config/lab.yaml)"
+	@echo "    make pi-gateway-validate-i2c-pi-to-pico — Pi i2cget @0x42 then Pico USB banner + digest (alias: pi-gateway-validate-pico-i2c)"
+	@echo "    make pi-gateway-validate-i2c-pi-to-uno — Pi i2cget @0x43 then Uno USB banner + digest (alias: pi-gateway-validate-uno-i2c)"
+	@echo "  make pi-gateway-validate-i2c-both — Pi i2cget 0x42 + 0x43 then Pico and Uno USB banners + digest"
+	@echo "  make pi-gateway-diagnose-i2c — ssh: i2cdetect -y bus"
+	@echo "  Staged bootstrap — see lab/docs/staged-bootstrap.md"
+	@echo "  make bootstrap-stage-dev-host — workspace: config pytest + Docker pico-build + uno-build (no device flash)"
+	@echo "  make bootstrap-stage-gateway — prerequisite: pi-gateway-health + subtarget-check (needs SSH)"
+	@echo "  make bootstrap-stage-zero — Stage 0: flash ONE MCU + unique firmware attestation (ZERO_TARGET=pico|uno)"
+	@echo "    BOOTSTRAP_ZERO_I2C=1 — after Pico flash, also i2cget reg 0 @ 0x42"
+	@echo "  make bootstrap-stage-pico / bootstrap-stage-uno — alias Pico-first or full Uno flash-test"
+	@echo "  make bootstrap-pipeline — workspace + gateway + Stage 0 + second MCU (ZERO_TARGET=pico: then Uno; uno: then Pico)"
+	@echo "  make pi-gateway-hello-lab-hardware-smoke — Docker rebuild hello_lab with unique digest per run, flash Pico+Uno, validate banners (not CI; needs GATEWAY + devices)"
+	@echo "  make pi-gateway-hello-lab-hardware-smoke-uno — same digest flow for Uno only (uno-build + flash-test-uno)"
+	@echo "  make pi-gateway-hello-lab-hardware-smoke-pico — same digest flow for Pico only (pico-build + flash-test-pico)"
 	@echo "  make sync-pi-gateway-flash-deps / pi-gateway-sync — rsync only lab/pi Makefile + flash scripts (no Docker/firmware tree)"
 	@echo "    Uno-only: UNO_ONLY=1 make pi-gateway-sync GATEWAY=…"
 	@echo "    Pi repo path: omit GATEWAY_REPO_ROOT for ~/cede on Pi; or quote — GATEWAY_REPO_ROOT='~/src/cede' (unquoted ~/… expands to dev-host home in GNU Make)"
 
 # Push minimal Pi-gateway files for `make -C lab/pi flash-uno` / subtarget-check (see lab/pi/scripts/sync_gateway_flash_deps.sh).
 GATEWAY ?= pi@cede-pi.local
+# Optional Uno tty when PORT names the Pico (e.g. pi-gateway-hello-lab-hardware-smoke).
+UNO_PORT ?=
 # Remote checkout on the Pi. Leave empty: sync uses literal ~/cede on the gateway (see sync_gateway_flash_deps.sh).
 # Do not use ?= ~/… here — GNU Make expands ~ to this machine's home and breaks ssh/rsync targets.
 GATEWAY_REPO_ROOT ?=
@@ -76,11 +102,15 @@ pi-gateway-flash-uno:
 	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UNO_ONLY="$(UNO_ONLY)" bash lab/pi/scripts/devhost_pi_gateway.sh flash-uno --hex "$(HEX)" $(if $(PORT),--port "$(PORT)",) $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
 pi-gateway-validate-uno:
-	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial --wait "$(UNO_VALIDATE_WAIT)" $(if $(PORT),--port "$(PORT)",)
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial --wait "$(UNO_VALIDATE_WAIT)" $(if $(PORT),--port "$(PORT)",) $(if $(strip $(FIRMWARE_DIGEST)),--digest "$(FIRMWARE_DIGEST)",)
 
 pi-gateway-flash-test-uno:
 	@$(MAKE) pi-gateway-flash-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)"
-	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"
+	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
+
+pi-gateway-flash-test-uno-i2c:
+	@$(MAKE) pi-gateway-flash-test-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"
+	@$(MAKE) pi-gateway-validate-uno-i2c GATEWAY="$(GATEWAY)" I2C_BUS="$(I2C_BUS)" UNO_I2C_ADDR="$(UNO_I2C_ADDR)"
 
 pi-gateway-resolve-port-pico:
 	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" bash lab/pi/scripts/devhost_pi_gateway.sh resolve-port-pico
@@ -94,17 +124,144 @@ pi-gateway-flash-pico:
 	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" bash lab/pi/scripts/devhost_pi_gateway.sh flash-pico --uf2 "$(UF2)" $(if $(filter 1,$(PICO_BOOTSEL_ONLY)),--bootsel-only,) $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
 pi-gateway-validate-pico:
-	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-pico-serial $(if $(PORT),--port "$(PORT)",)
+	cd "$(REPO_ROOT)" && GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" bash lab/pi/scripts/devhost_pi_gateway.sh validate-pico-serial $(if $(PORT),--port "$(PORT)",) $(if $(strip $(FIRMWARE_DIGEST)),--digest "$(FIRMWARE_DIGEST)",)
 
 pi-gateway-flash-test-pico:
 	@$(MAKE) pi-gateway-flash-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" SKIP_SYNC="$(SKIP_SYNC)"
-	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
+	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
+
+pi-gateway-flash-test-pico-i2c:
+	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
+	@$(MAKE) pi-gateway-validate-i2c-pi-to-pico GATEWAY="$(GATEWAY)" I2C_BUS="$(I2C_BUS)" PICO_I2C_ADDR="$(PICO_I2C_ADDR)"
+
+# Optional I2C smoke (hello_lab): Pico @ 0x42, Uno @ 0x43 — both may coexist on bus 1 (lab/docs/staged-bootstrap.md).
+I2C_BUS ?= 1
+PICO_I2C_ADDR ?= 0x42
+UNO_I2C_ADDR ?= 0x43
+pi-gateway-validate-pico-i2c: pi-gateway-validate-i2c-pi-to-pico
+pi-gateway-validate-uno-i2c: pi-gateway-validate-i2c-pi-to-uno
+
+pi-gateway-validate-i2c-pi-to-pico:
+	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cget -y $(I2C_BUS) $(PICO_I2C_ADDR) 0 b"
+	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
+
+pi-gateway-validate-i2c-pi-to-uno:
+	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cget -y $(I2C_BUS) $(UNO_I2C_ADDR) 0 b"
+	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
+
+# Single bring-up path: reads i2c_matrix.pairs[].validation (controller + mode) from lab config.
+ONLY_I2C_PAIR ?=
+pi-gateway-validate-i2c-from-lab:
+	cd "$(REPO_ROOT)" && \
+	GATEWAY="$(GATEWAY)" \
+	GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" \
+	CEDE_LAB_CONFIG="$(CEDE_LAB_CONFIG)" \
+	CEDE_EXPECT_DIGEST="$(FIRMWARE_DIGEST)" \
+	uv run python lab/pi/scripts/lab_i2c_matrix_validate.py \
+	  --gateway "$(GATEWAY)" \
+	  $(if $(strip $(GATEWAY_REPO_ROOT)),--gateway-repo "$(GATEWAY_REPO_ROOT)",) \
+	  $(if $(strip $(CEDE_LAB_CONFIG)),--config "$(CEDE_LAB_CONFIG)",) \
+	  $(if $(strip $(ONLY_I2C_PAIR)),--only "$(ONLY_I2C_PAIR)",) \
+	  $(if $(filter 1,$(I2C_VALIDATE_DRY_RUN)),--dry-run,)
+
+# Small gap between probes avoids some slaves missing the second START; Uno must run current hello_lab (I2C @ 0x43).
+pi-gateway-validate-i2c-both:
+	@cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "set -e; printf 'Pico %s reg0: ' '$(PICO_I2C_ADDR)'; sudo i2cget -y $(I2C_BUS) $(PICO_I2C_ADDR) 0 b; sleep 0.25; printf 'Uno %s reg0: ' '$(UNO_I2C_ADDR)'; sudo i2cget -y $(I2C_BUS) $(UNO_I2C_ADDR) 0 b" \
+		|| { printf '%s\n' "Uno did not ACK at $(UNO_I2C_ADDR). Reflash Uno hello_lab (I2C moved from 0x42 to 0x43): make pi-gateway-flash-test-uno-i2c GATEWAY=$(GATEWAY)" >&2; exit 1; }
+	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
+	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
+
+pi-gateway-diagnose-i2c:
+	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cdetect -y $(I2C_BUS) 2>/dev/null || { echo 'i2cdetect failed (install i2c-tools? i2c enabled in raspi-config?)' >&2; exit 1; }"
+
+# --- Staged bootstrap (lab/docs/staged-bootstrap.md) ---
+# Stage 0 = first hardware gate: flash one device + unique firmware response (serial; optional I2C for Pico).
+ZERO_TARGET ?= pico
+BOOTSTRAP_ZERO_I2C ?=
+
+bootstrap-stage-dev-host:
+	@$(MAKE) test-config-local
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" pico-build
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" uno-build
+
+bootstrap-stage-gateway:
+	@$(MAKE) pi-gateway-health GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)"
+	@$(MAKE) pi-gateway-subtarget-check GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)"
+
+bootstrap-stage-zero-pico:
+	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
+	@if [ "$(BOOTSTRAP_ZERO_I2C)" = "1" ]; then $(MAKE) pi-gateway-validate-pico-i2c GATEWAY="$(GATEWAY)" I2C_BUS="$(I2C_BUS)" PICO_I2C_ADDR="$(PICO_I2C_ADDR)"; fi
+
+bootstrap-stage-zero-uno:
+	@$(MAKE) pi-gateway-flash-test-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"
+
+bootstrap-stage-zero:
+	@$(MAKE) bootstrap-stage-zero-$(ZERO_TARGET) GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" HEX="$(HEX)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" BOOTSTRAP_ZERO_I2C="$(BOOTSTRAP_ZERO_I2C)" I2C_BUS="$(I2C_BUS)"
+
+bootstrap-stage-pico: bootstrap-stage-zero-pico
+
+bootstrap-stage-uno:
+	@$(MAKE) pi-gateway-flash-test-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"
+
+# Second MCU after Stage 0: if Stage 0 was Pico → Uno; if Uno → Pico.
+bootstrap-pipeline:
+	@$(MAKE) bootstrap-stage-dev-host
+	@$(MAKE) bootstrap-stage-gateway GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)"
+	@$(MAKE) bootstrap-stage-zero GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" ZERO_TARGET="$(ZERO_TARGET)" UF2="$(UF2)" HEX="$(HEX)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" BOOTSTRAP_ZERO_I2C="$(BOOTSTRAP_ZERO_I2C)" I2C_BUS="$(I2C_BUS)"
+	@if [ "$(ZERO_TARGET)" = "pico" ]; then $(MAKE) bootstrap-stage-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)"; \
+	elif [ "$(ZERO_TARGET)" = "uno" ]; then $(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"; \
+	else echo "ZERO_TARGET must be pico or uno" >&2; exit 1; fi
 
 sync:
 	cd "$(REPO_ROOT)" && uv sync
 
 test-config-local:
 	cd "$(REPO_ROOT)" && uv run pytest -q lab/tests/test_config_schema.py
+
+# Introspection for tests (lab/tests/test_firmware_digest.py): DIGEST= overrides FIRMWARE_DIGEST.
+.PHONY: print-firmware-digest print-cede-repo-digest
+print-firmware-digest:
+	@printf '%s\n' '$(FIRMWARE_DIGEST)'
+
+print-cede-repo-digest:
+	@printf '%s\n' '$(CEDE_REPO_DIGEST)'
+
+# Rebuild hello_lab with a unique digest, flash Pico + Uno on the gateway, validate USB banners (rejects stale images).
+# Requires: Docker (lab/docker), SSH to GATEWAY, Pico + Uno on the Pi. Optional UNO_PORT when PORT names the Pico.
+# Pytest: CEDE_RUN_HARDWARE_FULL=1 uv run pytest -q lab/tests/test_hello_lab_hardware_full.py
+# Must use := when generating: `?=` + `$(shell …)` is recursive, so every $(CEDE_TEST_IMAGE_ID) expansion
+# re-ran cede_test_image_id.py and produced a different suffix for echo vs docker vs DIGEST=.
+ifeq ($(origin CEDE_TEST_IMAGE_ID),undefined)
+CEDE_TEST_IMAGE_ID := $(shell python3 "$(REPO_ROOT)/lab/pi/scripts/cede_test_image_id.py")
+endif
+.PHONY: pi-gateway-hello-lab-hardware-smoke
+pi-gateway-hello-lab-hardware-smoke:
+	@echo ""
+	@echo "=== hello_lab digest smoke: build (Docker) + flash + serial validate ==="
+	@echo "embedded-digest (must appear on USB as digest=<this>): $(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" pico-build uno-build CEDE_IMAGE_ID="$(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" DIGEST="$(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) pi-gateway-flash-test-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(UNO_PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" DIGEST="$(CEDE_TEST_IMAGE_ID)"
+
+# Same unique digest idea as pi-gateway-hello-lab-hardware-smoke, but Uno only (Docker uno-build + flash + serial digest).
+# Pytest: CEDE_RUN_HARDWARE_UNO=1 uv run pytest -q lab/tests/test_hello_lab_hardware_uno_digest.py
+.PHONY: pi-gateway-hello-lab-hardware-smoke-uno
+pi-gateway-hello-lab-hardware-smoke-uno:
+	@echo ""
+	@echo "=== hello_lab Uno digest smoke: docker uno-build + avrdude flash + serial validate ==="
+	@echo "embedded-digest (must appear on USB as digest=<this>): $(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" uno-build CEDE_IMAGE_ID="$(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) pi-gateway-flash-test-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(HEX)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" DIGEST="$(CEDE_TEST_IMAGE_ID)"
+
+# Same unique digest idea as pi-gateway-hello-lab-hardware-smoke, but Pico only (Docker pico-build + flash + serial digest).
+# Pytest: CEDE_RUN_HARDWARE_PICO=1 uv run pytest -q lab/tests/test_hello_lab_hardware_pico_digest.py
+.PHONY: pi-gateway-hello-lab-hardware-smoke-pico
+pi-gateway-hello-lab-hardware-smoke-pico:
+	@echo ""
+	@echo "=== hello_lab Pico digest smoke: docker pico-build + UF2 flash + serial validate ==="
+	@echo "embedded-digest (must appear on USB as digest=<this>): $(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) -C "$(REPO_ROOT)/lab/docker" pico-build CEDE_IMAGE_ID="$(CEDE_TEST_IMAGE_ID)"
+	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" DIGEST="$(CEDE_TEST_IMAGE_ID)"
 
 validate:
 	cd "$(REPO_ROOT)" && uv sync && uv run pytest -q lab/tests/

@@ -2,7 +2,11 @@
 
 Use this runbook **after** gateway bootstrapping has passed its **E2E** checks (patched `.img`, verify, flash, SSH). Pico/Uno flashing assumes a sane Pi OS gateway and a working **`ssh`** session — not half-repaired cloud-init.
 
+**Staged bootstrap:** **[lab/docs/staged-bootstrap.md](../../docs/staged-bootstrap.md)** — **Stage 0** is **flash + unique firmware attestation** (`make bootstrap-stage-zero`); workspace build and gateway health are separate gates (`make bootstrap-stage-dev-host`, `make bootstrap-stage-gateway`).
+
 **Gateway layout:** do **not** install a **`git clone`** of CEDE on the Pi. Dev-Host pushes only [**`sync_gateway_flash_deps.sh`**](../scripts/sync_gateway_flash_deps.sh) artifacts (**`lab/pi/Makefile`**, **`lab/pi/scripts/*.py|.sh`**) into a **sparse** directory (default **`~/cede`**). Treat **`GATEWAY_REPO_ROOT`** as that flash-deps root, not a full repository.
+
+**Bus wiring reference:** [bus-wiring.md](bus-wiring.md) is the canonical no-rewire harness specification for USB baseline + I2C + SPI across Pi/Pico/Uno.
 
 **Order:** finish the **[Gateway E2E verification gate](rpi3-gateway-remote.md#gateway-e2e-verification-gate)** (`make validate`, **`make pi-gateway-sd-ready`**, **`pi-gateway-verify-boot`**, bench flash, then **`ping`** + **`ssh`**). Fix wrong **`user-data`**, missing keys, or sudo policy by **remounting the SD or loop-mounting the `.img`** and re-running **`prepare_sdcard_boot.sh`** / **`patch-image`** ([cli-flash.md](cli-flash.md)); do not chase bring-up bugs by editing `/etc` on the live Pi from this workflow.
 
@@ -19,10 +23,14 @@ These pieces are wired and repeatable from the **Dev-Host** without opening an i
 | **cede-rp2** **`PORT`** | Gateway-side [`pi_resolve_gateway_pico.py`](../scripts/pi_resolve_gateway_pico.py): **`/dev/serial/by-id/usb-Raspberry_Pi*`** first; else lone **`ttyACM*`** not claimed by **`usb-Arduino*`** . |
 | Flash + verify (Uno) | **`avrdude`** via [`pi_flash_uno_avrdude.sh`](../scripts/pi_flash_uno_avrdude.sh). |
 | Flash UF2 (**cede-rp2**) | [`pi_flash_pico_auto.sh`](../scripts/pi_flash_pico_auto.sh): tries **`picotool reboot -uf`** (`-f` helps when prior firmware is USB serial, e.g. MicroPython) when the Pi’s **`picotool`** build includes USB (**`reboot`** command); waits for **`RPI-RP2`**; copies UF2. **`PICO_BOOTSEL_ONLY=1`** skips **`picotool`** (Pico already in BOOTSEL). Fallback: [`pi_flash_pico_uf2.sh`](../scripts/pi_flash_pico_uf2.sh). |
-| Serial (**cede-uno**) | **`CEDE hello_lab ok`** @ 115200; [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py). |
-| Serial (**cede-rp2**) | **`CEDE hello_lab rp2 ok`** from USB CDC; [`pi_validate_pico_serial.py`](../scripts/pi_validate_pico_serial.py). |
+| Serial (**cede-uno**) | Banner **`CEDE hello_lab ok digest=<id>`** @ 115200 (`<id>` = build-time git short or `CEDE_IMAGE_ID` / `nogit`); [`pi_validate_uno_serial.py`](../scripts/pi_validate_uno_serial.py) optional **`--digest`** to pin `<id>`. |
+| I2C matrix (per pair) | Prefer **`make pi-gateway-validate-i2c-from-lab`** (reads **`lab.yaml`** **`i2c_matrix`** / **`validation`**). Pi→MCU aliases: **`pi-gateway-validate-i2c-pi-to-pico`**, **`…-pi-to-uno`** — [bus-wiring.md](bus-wiring.md) § *I2C matrix tests*. Flash+Pi I2C for one board: **`pi-gateway-flash-test-pico-i2c`** / **`pi-gateway-flash-test-uno-i2c`**. |
+| Serial (**cede-rp2**) | **`CEDE hello_lab rp2 ok digest=<id>`** from USB CDC (same digest rules as Uno); [`pi_validate_pico_serial.py`](../scripts/pi_validate_pico_serial.py) optional **`--digest`**. |
 | Offline tests | `pytest lab/tests/test_uno_gateway_env.py`, **`lab/tests/test_pico_gateway_env.py`**. |
-| Hardware pytest stubs | [`test_hello_lab_matrix.py`](../../tests/test_hello_lab_matrix.py) (`test_flash_*_from_pi`) — still skipped until Pi-hosted automation. |
+| Full hello_lab hardware (not CI) | **`make pi-gateway-hello-lab-hardware-smoke GATEWAY=pi@cede-pi.local`** — Docker **`pico-build` + `uno-build`** with a **new `CEDE_TEST_IMAGE_ID` every run** (override to pin: **`CEDE_TEST_IMAGE_ID=myid12 make …`**), then **`pi-gateway-flash-test-pico`** / **`…-uno`** with **`DIGEST`** set to that id so serial validators reject stale UF2/HEX. Needs Pico + Uno on the Pi; use **`UNO_PORT`** when **`PORT`** is the Pico. Pytest: **`CEDE_RUN_HARDWARE_FULL=1 uv run pytest lab/tests/test_hello_lab_hardware_full.py`**. |
+| Uno-only digest smoke | **`make pi-gateway-hello-lab-hardware-smoke-uno`** — **`uno-build`** with fresh **`CEDE_TEST_IMAGE_ID`**, **`pi-gateway-flash-test-uno`** + **`DIGEST`**. Pytest: **`CEDE_RUN_HARDWARE_UNO=1 uv run pytest lab/tests/test_hello_lab_hardware_uno_digest.py`**. |
+| Pico-only digest smoke | **`make pi-gateway-hello-lab-hardware-smoke-pico`** — **`pico-build`** with fresh **`CEDE_TEST_IMAGE_ID`**, **`pi-gateway-flash-test-pico`** + **`DIGEST`**. Pytest: **`CEDE_RUN_HARDWARE_PICO=1 uv run pytest lab/tests/test_hello_lab_hardware_pico_digest.py`**. |
+| Hardware pytest stubs | [`test_hello_lab_matrix.py`](../../tests/test_hello_lab_matrix.py) — legacy skips; prefer **`test_hello_lab_hardware_full.py`** above. |
 
 **Naming:** **`cede-pi`** = gateway host; **`cede-uno`** / **`cede-rp2`** = logical MCU subtargets (docs / Make); future **`cede-rp2-micropython`** is out of scope here.
 
@@ -47,6 +55,7 @@ make pi-gateway-flash-test-pico GATEWAY=pi@cede-pi.local
 # Pico already in BOOTSEL or picotool without USB:
 make pi-gateway-flash-pico GATEWAY=pi@cede-pi.local PICO_BOOTSEL_ONLY=1
 
+# Flash both MCUs then inter-MCU I2C (see bus-wiring.md § I2C matrix tests)
 make pi-gateway-resolve-port-uno GATEWAY=pi@cede-pi.local
 make pi-gateway-resolve-port-pico GATEWAY=pi@cede-pi.local
 make pi-gateway-print-serial GATEWAY=pi@cede-pi.local

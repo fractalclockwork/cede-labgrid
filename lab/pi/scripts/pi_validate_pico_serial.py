@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Open cede-rp2 (Pico USB CDC) and confirm hello_lab banner. Run ON the gateway Pi."""
+"""Open cede-rp2 (Pico USB CDC) and confirm hello_lab banner. Run ON the gateway Pi.
+
+On success prints expected-digest: and digest-banner: (hello_lab line containing digest=) before the full capture.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +14,8 @@ import subprocess
 import sys
 import termios
 import time
+
+from cede_firmware_attest import attestation_failure_reason, digest_banner_line, expected_digest_value
 
 
 def _read_with_pyserial(port: str, baud: int, wait: float, expect_b: bytes) -> bytes:
@@ -108,6 +113,11 @@ def main() -> int:
         default=3.0,
         help="seconds to wait for banner (hello_lab prints ~1.5s after boot, repeats every 3s)",
     )
+    p.add_argument(
+        "--digest",
+        default="",
+        help="require digest=<value> to match this id (else CEDE_EXPECT_DIGEST env); banner must always include digest=",
+    )
     args = p.parse_args()
 
     expect_b = args.expect.encode("utf-8")
@@ -130,6 +140,16 @@ def main() -> int:
 
     text = buf.decode("utf-8", errors="replace")
     if expect_b in buf:
+        want = expected_digest_value(args.digest)
+        why = attestation_failure_reason(buf, "pico", want)
+        if why:
+            print(f"validate: fail ({why})", file=sys.stderr)
+            print(text.strip(), file=sys.stderr)
+            return 3
+        print(f"expected-digest: {want if want else '(any digest= token)'}")
+        bline = digest_banner_line(buf, "pico")
+        if bline:
+            print(f"digest-banner: {bline}")
         print("validate: ok (cede-rp2 serial banner present)")
         print(text.strip())
         return 0

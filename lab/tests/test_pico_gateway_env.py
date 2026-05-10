@@ -43,6 +43,8 @@ def test_sync_gateway_deps_lists_pico_cede_rp2_scripts(repo_root: Path) -> None:
         "pi_flash_pico_auto.sh",
         "pi_resolve_gateway_pico.py",
         "pi_validate_pico_serial.py",
+        "cede_firmware_attest.py",
+        "lab_i2c_matrix_validate.py",
         "pi_flash_pico_uf2.sh",
     ):
         assert name in body, f"sync_gateway_flash_deps.sh should list {name}"
@@ -52,6 +54,8 @@ def test_hello_lab_prints_rp2_banner(repo_root: Path) -> None:
     text = (repo_root / "lab" / "pico" / "hello_lab" / "src" / "main.c").read_text(encoding="utf-8")
     assert "stdio_init_all" in text
     assert "CEDE hello_lab rp2 ok" in text
+    assert "digest=" in text and "CEDE_IMAGE_ID" in text
+    assert "CEDE i2c pico_to_uno ok" in text
 
 
 @pytest.mark.parametrize(

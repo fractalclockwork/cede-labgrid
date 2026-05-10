@@ -38,30 +38,51 @@ paths:
   test_results_dir: "lab/tests/results"
 
 # Hello Lab Test 7 — only enabled pairs are exercised; n/a pairs must declare reason.
+# Wiring + electrical policy (level shifting, pull-ups, pin maps): lab/pi/docs/bus-wiring.md
 i2c_matrix:
   bus_hz: 100000
+  # Default when tooling reads a single address; enabled pairs should set probe_address explicitly.
   probe_address: 0x42
   pairs:
     - initiator: rpi
       target: pico
       status: enabled
       linux_bus: 1
-      notes: "Pi as controller; Pico target firmware must ACK probe."
+      probe_address: 0x42
+      notes: "cede-rp2 hello_lab @ 0x42 (GP0/1, LV). Coexists with Uno @ 0x43 on the shifter."
+      validation:
+        mode: rpi_master_i2cdev_read
+        controller: rpi
+        reg: 0
+        expect_byte: 0xCE
 
     - initiator: rpi
       target: uno
-      status: n/a
-      reason: "Requires level shifting / wiring not populated on bench v0."
+      status: enabled
+      linux_bus: 1
+      probe_address: 0x43
+      notes: "cede-uno hello_lab @ 0x43 (A4/A5, HV). Distinct from Pico @ 0x42 on the same bus."
+      validation:
+        mode: rpi_master_i2cdev_read
+        controller: rpi
+        reg: 0
+        expect_byte: 0xCE
 
-    - initiator: pico
-      target: uno
-      status: n/a
-      reason: "Inter-MCU I2C needs shared bus + translation; document before enabling."
-
-    - initiator: uno
-      target: pico
-      status: n/a
-      reason: "Same as pico→uno; enable only when electrically verified."
+# Planned native SPI matrix shape (not yet schema-enforced):
+# spi_matrix:
+#   clock_hz: 100000
+#   mode: 0
+#   pairs:
+#     - initiator: rpi
+#       target: pico
+#       status: enabled
+#       chip_select: ce0
+#       notes: "Pi SPI0 controller to Pico SPI peripheral on CS_PICO."
+#     - initiator: rpi
+#       target: uno
+#       status: n/a
+#       reason: "Enable once 5V<->3.3V SPI level shifting is electrically validated."
+#       chip_select: ce1
 
 metrics:
   enabled: false

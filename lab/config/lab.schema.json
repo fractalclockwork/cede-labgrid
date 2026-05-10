@@ -114,6 +114,40 @@
         }
       }
     },
+    "i2cPairValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "controller"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["rpi_master_i2cdev_read"],
+          "description": "Pi as Linux I2C master (i2cget) to the target MCU at probe_address."
+        },
+        "controller": {
+          "type": "string",
+          "enum": ["rpi"],
+          "description": "Must be rpi for rpi_master_i2cdev_read (Pi drives SCL on the shared harness)."
+        },
+        "reg": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Target register index for rpi_master_i2cdev_read (hello_lab uses 0)."
+        },
+        "expect_byte": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Expected byte for rpi_master_i2cdev_read (hello_lab reg0 = 0xCE)."
+        },
+        "linux_bus": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Override Pi Linux bus number; default is pair.linux_bus when mode is rpi_master_i2cdev_read."
+        }
+      }
+    },
     "i2cPair": {
       "type": "object",
       "additionalProperties": false,
@@ -133,7 +167,14 @@
         },
         "reason": { "type": "string" },
         "linux_bus": { "type": "integer", "minimum": 0 },
-        "notes": { "type": "string" }
+        "probe_address": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 119,
+          "description": "7-bit address of target MCU as I2C slave on the shared harness (Pi reads)."
+        },
+        "notes": { "type": "string" },
+        "validation": { "$ref": "#/$defs/i2cPairValidation" }
       },
       "allOf": [
         {
@@ -142,6 +183,13 @@
             "required": ["status"]
           },
           "then": { "required": ["reason"] }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "enabled" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["probe_address", "validation"] }
         }
       ]
     },
