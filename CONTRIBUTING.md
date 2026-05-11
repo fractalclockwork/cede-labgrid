@@ -58,7 +58,9 @@ LabGrid tests use the coordinator/exporter infrastructure instead of direct SSH.
 | `make lg-test-i2c` | I2C matrix tests via LabGrid |
 | `make lg-test-all` | All LabGrid hardware tests |
 
-These targets run inside the `orchestration-dev` container with `pytest --lg-env env/remote.yaml`. Tests are marked with `@pytest.mark.labgrid` (registered in `lab/tests/conftest_labgrid.py`). The test files are `test_pico_labgrid.py`, `test_uno_labgrid.py`, and `test_i2c_labgrid.py` under `lab/tests/`.
+These targets run inside the `orchestration-dev` container with `pytest --lg-env env/remote.yaml`. Tests are marked with `@pytest.mark.labgrid` (registered in `lab/tests/conftest.py`). The test files are `test_pico_labgrid.py`, `test_uno_labgrid.py`, and `test_i2c_labgrid.py` under `lab/tests/`.
+
+To capture serial console logs for debugging, set `LG_LOG=<dir>` on any target (e.g. `make lg-test-pico LG_LOG=tmp/lg-logs`). See [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md) for details.
 
 ## Code Style
 

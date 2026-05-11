@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import shlex
-import subprocess
 import time
 
 import attr
@@ -17,6 +16,9 @@ from labgrid.driver import Driver
 from labgrid.factory import target_factory
 from labgrid.protocol import CommandProtocol
 from labgrid.step import step
+from labgrid.util.managedfile import ManagedFile
+
+from cede_labgrid.protocols.flash import FlashProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +28,18 @@ BOOTSEL_TIMEOUT_DEFAULT = 15
 
 @target_factory.reg_driver
 @attr.s(eq=False)
-class PicotoolFlashDriver(Driver):
+class PicotoolFlashDriver(Driver, FlashProtocol):
     """Flash a Pico UF2 through the exporter's SSH/command channel.
 
     Bindings:
         command: CommandProtocol (SSHDriver or ShellDriver on the Pi)
+        port:    USBSerialPort (Pico serial; used for ManagedFile transfer)
     """
 
-    bindings = {"command": CommandProtocol}
+    bindings = {
+        "command": CommandProtocol,
+        "port": {"USBSerialPort", "NetworkSerialPort"},
+    }
 
     image = attr.ib(default="pico_uf2", validator=attr.validators.instance_of(str))
     bootsel_timeout = attr.ib(default=BOOTSEL_TIMEOUT_DEFAULT, validator=attr.validators.instance_of(int))
@@ -50,14 +56,17 @@ class PicotoolFlashDriver(Driver):
         """Transfer UF2 to the Pi and copy it to the Pico in BOOTSEL mode."""
         local_path = self._resolve_image_path() if image is None else image
 
-        remote_path = f"/tmp/{local_path.rsplit('/', 1)[-1]}"
-        self._transfer_image(local_path, remote_path)
+        remote_path = self._transfer_image(local_path)
         self._enter_bootsel()
         self._wait_and_copy_uf2(remote_path)
 
-    def _transfer_image(self, local_path: str, remote_path: str) -> None:
-        logger.info("Transferring %s -> %s on gateway", local_path, remote_path)
-        self.command.put(local_path, remote_path)
+    def _transfer_image(self, local_path: str) -> str:
+        """Sync the UF2 to the exporter host via ManagedFile (content-addressed cache)."""
+        mf = ManagedFile(local_path, self.port)
+        mf.sync_to_resource()
+        remote_path = mf.get_remote_path()
+        logger.info("Image synced to %s on gateway", remote_path)
+        return remote_path
 
     def _enter_bootsel(self) -> None:
         """Try picotool reboot -uf to put the Pico into BOOTSEL mode."""

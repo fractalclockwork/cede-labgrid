@@ -20,6 +20,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "emulated_linux_arm64: linux/arm64 OCI targets on Intel (QEMU/binfmt); Pi-gateway–class parity in containers",
     )
+    config.addinivalue_line(
+        "markers",
+        "labgrid: LabGrid-managed hardware test (needs coordinator + exporter)",
+    )
 
 
 @pytest.fixture

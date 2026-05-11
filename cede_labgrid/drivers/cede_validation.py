@@ -1,10 +1,9 @@
 """CedeValidationDriver -- validate firmware banner and digest via serial console.
 
 Reads the expected digest from a ``.digest`` sidecar file next to the build
-artifact registered in LabGrid's ``images:`` section.  Opens the serial
-console (via ConsoleProtocol), optionally resets the device (DTR toggle for
-Uno, post-flash reboot wait for Pico), reads the banner, and asserts the
-``digest=<token>`` field matches.
+artifact registered in LabGrid's ``images:`` section.  Uses ConsoleExpectMixin
+(pexpect-style matching with --lg-log integration) to wait for the banner and
+assert the ``digest=<token>`` field matches.
 
 This replaces the old FIRMWARE_DIGEST / CEDE_TEST_IMAGE_ID / cede_firmware_attest.py
 pipeline with a single LabGrid driver.
@@ -14,12 +13,12 @@ from __future__ import annotations
 
 import logging
 import re
-import time
 from pathlib import Path
 from typing import Literal
 
 import attr
 from labgrid.driver import Driver
+from labgrid.driver.consoleexpectmixin import ConsoleExpectMixin
 from labgrid.factory import target_factory
 from labgrid.protocol import ConsoleProtocol
 from labgrid.step import step
@@ -52,8 +51,10 @@ def _read_digest_sidecar(image_path: str) -> str:
 
 @target_factory.reg_driver
 @attr.s(eq=False)
-class CedeValidationDriver(Driver):
+class CedeValidationDriver(ConsoleExpectMixin, Driver):
     """Validate a CEDE firmware banner + digest token over serial.
+
+    Uses ConsoleExpectMixin for pexpect-style matching and --lg-log integration.
 
     Bindings:
         console: ConsoleProtocol (SerialDriver)
@@ -64,6 +65,13 @@ class CedeValidationDriver(Driver):
     role = attr.ib(validator=attr.validators.in_(("pico", "uno")))
     image = attr.ib(validator=attr.validators.instance_of(str))
     banner_timeout = attr.ib(default=8.0, validator=attr.validators.instance_of(float))
+    txdelay = attr.ib(default=0.0, validator=attr.validators.instance_of(float))
+
+    def _read(self, size: int = 1, timeout: float = 0.0, max_size: int | None = None) -> bytes:
+        return self.console.read(size=size, timeout=timeout, max_size=max_size)
+
+    def _write(self, data: bytes) -> int:
+        return self.console.write(data)
 
     @Driver.check_active
     @step(args=["role", "image"])
@@ -82,24 +90,27 @@ class CedeValidationDriver(Driver):
             self.role, expected_banner, expected_digest,
         )
 
-        text = self._read_serial(expected_banner)
-
-        if expected_banner not in text:
+        banner_pattern = re.escape(expected_banner) + r".*?digest=([A-Za-z0-9._-]+)"
+        try:
+            _, before, match, after = self.expect(banner_pattern, timeout=self.banner_timeout)
+        except TIMEOUT:
+            collected = self._expect.before or b""
+            text = collected.decode("utf-8", errors="replace") if isinstance(collected, bytes) else str(collected)
             raise RuntimeError(
                 f"Banner not found in serial output.  "
                 f"Expected {expected_banner!r} within {self.banner_timeout}s.  "
                 f"Got ({len(text)} chars): {text[:200]!r}"
-            )
+            ) from None
 
-        m = DIGEST_RE.search(text)
-        if not m:
+        actual_digest = match.group(1) if hasattr(match, "group") else ""
+        if not actual_digest:
+            text = _decode_expect(before) + _decode_expect(match) + _decode_expect(after)
             raise RuntimeError(
                 f"No digest= token in serial output.  "
                 f"Banner present but firmware did not emit digest=<id>.  "
                 f"Capture: {text[:200]!r}"
             )
 
-        actual_digest = m.group(1)
         if actual_digest.lower() != expected_digest.lower():
             raise RuntimeError(
                 f"Digest mismatch: device has digest={actual_digest!r}, "
@@ -109,20 +120,20 @@ class CedeValidationDriver(Driver):
         logger.info(
             "Validation passed: %s banner ok, digest=%s", self.role, actual_digest
         )
+        text = _decode_expect(before) + _decode_expect(match) + _decode_expect(after)
         return text
 
-    def _read_serial(self, expect: str) -> str:
-        """Read from the console until *expect* is seen or timeout expires."""
-        buf = b""
-        expect_b = expect.encode("utf-8")
-        deadline = time.monotonic() + self.banner_timeout
 
-        while time.monotonic() < deadline:
-            remaining = max(0.1, deadline - time.monotonic())
-            chunk = self.console.read(size=4096, timeout=min(remaining, 0.5))
-            if chunk:
-                buf += chunk
-            if expect_b in buf:
-                break
+def _decode_expect(value: object) -> str:
+    """Decode bytes/match/str from pexpect into a string."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if hasattr(value, "group"):
+        return value.group(0)
+    return str(value) if value else ""
 
-        return buf.decode("utf-8", errors="replace")
+
+try:
+    from pexpect import TIMEOUT
+except ImportError:
+    TIMEOUT = type("TIMEOUT", (Exception,), {})

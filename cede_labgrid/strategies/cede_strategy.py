@@ -24,6 +24,8 @@ from labgrid.factory import target_factory
 from labgrid.step import step
 from labgrid.strategy import GraphStrategy
 
+from cede_labgrid.protocols.flash import FlashProtocol
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,15 +35,13 @@ class CedeStrategy(GraphStrategy):
     """Manage a CEDE MCU target through off -> flashed -> validated."""
 
     bindings = {
-        "flash_driver": {
-            "PicotoolFlashDriver",
-            "AvrdudeFlashDriver",
-        },
+        "flash_driver": FlashProtocol,
         "validation_driver": "CedeValidationDriver",
+        "reset_driver": {"CedeResetDriver", None},
     }
 
     def state_off(self):
-        """Root state: ensure drivers are deactivated."""
+        """Root state: reset the target and deactivate drivers."""
         logger.info("CedeStrategy: entering state_off")
         try:
             self.target.deactivate(self.validation_driver)
@@ -51,6 +51,12 @@ class CedeStrategy(GraphStrategy):
             self.target.deactivate(self.flash_driver)
         except Exception:
             pass
+        if self.reset_driver is not None:
+            try:
+                self.target.activate(self.reset_driver)
+                self.reset_driver.reset()
+            except Exception:
+                logger.debug("Reset driver failed (non-fatal)", exc_info=True)
 
     @GraphStrategy.depends("off")
     def state_flashed(self):

@@ -276,6 +276,22 @@ invokes `PicotoolFlashDriver` / `AvrdudeFlashDriver` and
 | Garbled ser2net output after avrdude | Normal — avrdude resets the Uno via DTR. Reconnect or use the Python DTR-toggle method above |
 | Exporter disconnects | Check coordinator is running on Dev-Host; exporter auto-reconnects |
 
+### Capturing serial console logs
+
+Add `LG_LOG=<dir>` to any `lg-test-*` target to dump all serial I/O
+to files for post-mortem analysis:
+
+```bash
+make lg-test-pico LG_LOG=tmp/lg-logs
+# logs appear in tmp/lg-logs/console_cede-pico
+
+# live-tail during a test run:
+tail -F tmp/lg-logs/console_cede-pico
+```
+
+This passes `--lg-log` to pytest, which tells LabGrid to write raw
+serial bytes to per-target files in the specified directory.
+
 ## Infrastructure Setup (One-Time)
 
 When building a fresh SD image, the cloud-init pipeline automatically

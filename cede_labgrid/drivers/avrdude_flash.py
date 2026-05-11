@@ -13,15 +13,17 @@ import attr
 from labgrid.driver import Driver
 from labgrid.factory import target_factory
 from labgrid.protocol import CommandProtocol
-from labgrid.resource.udev import USBSerialPort
 from labgrid.step import step
+from labgrid.util.managedfile import ManagedFile
+
+from cede_labgrid.protocols.flash import FlashProtocol
 
 logger = logging.getLogger(__name__)
 
 
 @target_factory.reg_driver
 @attr.s(eq=False)
-class AvrdudeFlashDriver(Driver):
+class AvrdudeFlashDriver(Driver, FlashProtocol):
     """Flash an Uno HEX through the exporter's SSH/command channel.
 
     Bindings:
@@ -31,7 +33,7 @@ class AvrdudeFlashDriver(Driver):
 
     bindings = {
         "command": CommandProtocol,
-        "port": "USBSerialPort",
+        "port": {"USBSerialPort", "NetworkSerialPort"},
     }
 
     image = attr.ib(default="uno_hex", validator=attr.validators.instance_of(str))
@@ -51,13 +53,16 @@ class AvrdudeFlashDriver(Driver):
         """Transfer HEX to the Pi and flash via avrdude."""
         local_path = self._resolve_image_path() if image is None else image
 
-        remote_hex = f"/tmp/{local_path.rsplit('/', 1)[-1]}"
-        self._transfer_image(local_path, remote_hex)
+        remote_hex = self._transfer_image(local_path)
         self._run_avrdude(remote_hex)
 
-    def _transfer_image(self, local_path: str, remote_path: str) -> None:
-        logger.info("Transferring %s -> %s on gateway", local_path, remote_path)
-        self.command.put(local_path, remote_path)
+    def _transfer_image(self, local_path: str) -> str:
+        """Sync the HEX to the exporter host via ManagedFile (content-addressed cache)."""
+        mf = ManagedFile(local_path, self.port)
+        mf.sync_to_resource()
+        remote_path = mf.get_remote_path()
+        logger.info("Image synced to %s on gateway", remote_path)
+        return remote_path
 
     def _run_avrdude(self, remote_hex: str) -> None:
         serial_port = self.port.port

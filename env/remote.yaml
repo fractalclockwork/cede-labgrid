@@ -21,6 +21,8 @@ targets:
       CedeValidationDriver:
         role: 'pico'
         image: 'pico_uf2'
+      CedeResetDriver:
+        method: 'picotool'
       CedeStrategy: {}
 
   cede-uno:
@@ -36,6 +38,8 @@ targets:
       CedeValidationDriver:
         role: 'uno'
         image: 'uno_hex'
+      CedeResetDriver:
+        method: 'dtr'
       CedeStrategy: {}
 
   cede-pi:
@@ -45,10 +49,14 @@ targets:
         username: 'pi'
     drivers:
       SSHDriver: {}
+      CedeI2CDriver:
+        bus: 1
 
 images:
   pico_uf2: 'lab/pico/hello_lab/build/hello_lab.uf2'
   uno_hex: 'lab/uno/hello_lab/build/hello_lab.ino.hex'
+  pico_uf2_lab_stack: 'lab/pico/lab_stack/build/lab_stack.uf2'
+  uno_hex_lab_stack: 'lab/uno/lab_stack/build/lab_stack.ino.hex'
 
 tools:
   picotool: '/usr/bin/picotool'
@@ -58,4 +66,6 @@ imports:
   - cede_labgrid.drivers.picotool_flash
   - cede_labgrid.drivers.avrdude_flash
   - cede_labgrid.drivers.cede_validation
+  - cede_labgrid.drivers.cede_reset
+  - cede_labgrid.drivers.cede_i2c
   - cede_labgrid.strategies.cede_strategy

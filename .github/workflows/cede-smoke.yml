@@ -24,3 +24,61 @@ jobs:
         run: |
           docker compose -f lab/docker/docker-compose.yml run --rm orchestration-dev \
             bash -lc 'cd /workspace && pytest -q lab/tests/'
+
+  labgrid-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install deps
+        run: uv sync
+
+      - name: Verify LabGrid driver imports
+        run: |
+          uv run python -c "
+          from cede_labgrid.drivers.picotool_flash import PicotoolFlashDriver
+          from cede_labgrid.drivers.avrdude_flash import AvrdudeFlashDriver
+          from cede_labgrid.drivers.cede_validation import CedeValidationDriver
+          from cede_labgrid.drivers.cede_reset import CedeResetDriver
+          from cede_labgrid.drivers.cede_i2c import CedeI2CDriver
+          from cede_labgrid.strategies.cede_strategy import CedeStrategy
+          print('All CEDE LabGrid drivers import OK')
+          "
+
+      - name: Validate strategy graph
+        run: |
+          uv run python -c "
+          from labgrid.environment import Environment
+          import os, tempfile, yaml
+
+          cfg = {
+            'targets': {
+              'test': {
+                'resources': {},
+                'drivers': {
+                  'CedeStrategy': {},
+                },
+              },
+            },
+            'imports': [
+              'cede_labgrid.drivers.picotool_flash',
+              'cede_labgrid.drivers.avrdude_flash',
+              'cede_labgrid.drivers.cede_validation',
+              'cede_labgrid.drivers.cede_reset',
+              'cede_labgrid.strategies.cede_strategy',
+            ],
+          }
+
+          with tempfile.NamedTemporaryFile('w', suffix='.yaml', delete=False) as f:
+            yaml.dump(cfg, f)
+            f.flush()
+            env = Environment(f.name)
+            t = env.get_target('test')
+            strat = t.get_driver('CedeStrategy')
+            print(f'Strategy states: {[s.__name__ for s in strat.graph.nodes()]}' if hasattr(strat, 'graph') else 'Strategy loaded OK')
+          os.unlink(f.name)
+          print('Strategy graph validation passed')
+          "
