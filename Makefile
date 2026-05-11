@@ -61,7 +61,7 @@ help:
 	@echo "  make pi-gateway-diagnose-i2c — ssh: i2cdetect -y bus"
 	@echo "  make pi-gateway-ssd1306-dual [SKIP_SYNC=1] — sync + ssh: dual SSD1306 demo on gateway (Ctrl+C stops)"
 	@echo "  make pi-gateway-ssd1306-dual-bus-speed [SSD1306_SPEED_DURATION=15] — dual SSD1306 I2C throughput benchmark on gateway"
-	@echo "  make pi-gateway-ssd1306-eyes [SKIP_SYNC=1] — dual SSD1306 cartoon-eye animation on gateway (Ctrl+C stops)"
+	@echo "  make pi-gateway-ssd1306-eyes [SKIP_SYNC=1] [SSD1306_EYES_EXTRA_ARGS='…'] — cartoon eyes on gateway (extra args → Pi make ssd1306-eyes-run)"
 	@echo "  Staged bootstrap — see lab/docs/staged-bootstrap.md"
 	@echo "  make bootstrap-stage-dev-host — workspace: config pytest + Docker pico-build + uno-build (no device flash)"
 	@echo "  make bootstrap-stage-gateway — prerequisite: pi-gateway-health + subtarget-check (needs SSH)"
@@ -216,8 +216,9 @@ SSD1306_SPEED_DURATION ?= 10
 pi-gateway-ssd1306-dual-bus-speed:
 	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" SSD1306_SPEED_DURATION="$(SSD1306_SPEED_DURATION)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-dual-bus-speed $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
+SSD1306_EYES_EXTRA_ARGS ?=
 pi-gateway-ssd1306-eyes:
-	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-eyes-run $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
+	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" SSD1306_EYES_EXTRA_ARGS="$(SSD1306_EYES_EXTRA_ARGS)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-eyes-run $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
 # --- Staged bootstrap (lab/docs/staged-bootstrap.md) ---
 # Stage 0 = first hardware gate: flash one device + unique firmware response (serial; optional I2C for Pico).

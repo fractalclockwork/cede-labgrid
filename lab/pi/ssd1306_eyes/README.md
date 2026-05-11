@@ -36,6 +36,13 @@ make pi-gateway-ssd1306-eyes GATEWAY=pi@cede-pi.local
 
 That target **syncs** the sparse Pi tree (including these Python files), runs **`make -C lab/pi ssd1306-eyes-install`**, then **`ssd1306-eyes-run`** on the gateway.
 
+Optional **`SSD1306_EYES_EXTRA_ARGS`** is forwarded to the Pi (same as running `make ssd1306-eyes-run` locally there):
+
+```bash
+make pi-gateway-ssd1306-eyes GATEWAY=pi@cede-pi.local \
+  SSD1306_EYES_EXTRA_ARGS='--contrast-left 220 --contrast-right 255'
+```
+
 ### Sync only (push scripts, no run)
 
 On your **development machine**, from the repo root:

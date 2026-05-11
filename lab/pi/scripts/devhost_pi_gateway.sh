@@ -18,6 +18,7 @@
 #   ssd1306-dual-run [--no-sync] — rsync includes lab/pi/ssd1306_dual; Pi: venv + pip + run main.py (Ctrl+C)
 #   ssd1306-dual-bus-speed [--no-sync] — sync + install + bus_speed_test.py (SSD1306_SPEED_DURATION on Pi)
 #   ssd1306-eyes-run [--no-sync] — sync + install + ssd1306_eyes/main.py (Ctrl+C)
+#   SSD1306_EYES_EXTRA_ARGS — optional; forwarded to Pi `make ssd1306-eyes-run` (e.g. --contrast-left 220)
 
 set -euo pipefail
 
@@ -379,8 +380,8 @@ cmd_ssd1306_eyes_run() {
   fi
   echo "==> ${GATEWAY}: make -C lab/pi ssd1306-eyes-install …" >&2
   remote make -C lab/pi ssd1306-eyes-install
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-eyes-run (Ctrl+C stops) …" >&2
-  remote make -C lab/pi ssd1306-eyes-run
+  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-eyes-run (SSD1306_EYES_EXTRA_ARGS='${SSD1306_EYES_EXTRA_ARGS:-}') (Ctrl+C stops) …" >&2
+  remote env SSD1306_EYES_EXTRA_ARGS="${SSD1306_EYES_EXTRA_ARGS:-}" make -C lab/pi ssd1306-eyes-run
 }
 
 case "${1:-}" in
