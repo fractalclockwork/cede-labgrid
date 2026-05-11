@@ -38,6 +38,7 @@ class CedeStrategy(GraphStrategy):
         "flash_driver": FlashProtocol,
         "validation_driver": "CedeValidationDriver",
         "reset_driver": {"CedeResetDriver", None},
+        "console": {"SerialDriver", None},
     }
 
     def state_off(self):
@@ -51,6 +52,11 @@ class CedeStrategy(GraphStrategy):
             self.target.deactivate(self.flash_driver)
         except Exception:
             pass
+        if self.console is not None:
+            try:
+                self.target.deactivate(self.console)
+            except Exception:
+                pass
         if self.reset_driver is not None:
             try:
                 self.target.activate(self.reset_driver)
@@ -62,6 +68,11 @@ class CedeStrategy(GraphStrategy):
     def state_flashed(self):
         """Flash firmware to the target MCU."""
         logger.info("CedeStrategy: entering state_flashed")
+        if self.console is not None:
+            try:
+                self.target.deactivate(self.console)
+            except Exception:
+                pass
         self.target.activate(self.flash_driver)
         self.flash_driver.flash()
 

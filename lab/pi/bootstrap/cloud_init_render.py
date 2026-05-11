@@ -25,8 +25,6 @@ def _read_ssh_keys(keys_file: Path) -> list[str]:
     return keys
 
 
-# Pi OS default-style supplementary groups + passwordless sudo (cloud-init must set these when the
-# user stanza is present; a minimal entry with only ssh_authorized_keys can leave 'pi' without sudo).
 _PI_GATEWAY_GROUPS = (
     "users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,"
     "gpio,spi,i2c,render,disk,sudo"
@@ -97,47 +95,68 @@ _BASE_FINAL_MSG = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Exporter YAML generation (shared by cloud-init write_files and generate-*)
+# ---------------------------------------------------------------------------
+
+def render_exporter_yaml(exporter: dict) -> str:
+    """Build the labgrid exporter config YAML from an exporter entry's resources."""
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError as e:
+        raise SystemExit("PyYAML is required") from e
+
+    location = exporter.get("location", "")
+    groups: dict = {}
+    for res in exporter["resources"]:
+        group_name = res["group"]
+        entry: dict = {}
+        if location:
+            entry["location"] = location
+        entry[res["type"]] = {
+            "match": dict(res["match"]),
+        }
+        speed = res.get("speed", 115200)
+        if speed != 115200:
+            entry[res["type"]]["speed"] = speed
+        else:
+            entry[res["type"]]["speed"] = speed
+        groups[group_name] = entry
+
+    return yaml.safe_dump(groups, default_flow_style=False, sort_keys=False).rstrip() + "\n"
+
+
 def _render_labgrid_write_files(
     ssh_user: str,
-    labgrid: dict[str, str],
+    coordinator_address: str,
+    exporter: dict,
 ) -> str:
     """Generate cloud-init write_files entries for the exporter config and systemd unit."""
-    coord = labgrid["coordinator_address"]
-    exporter_name = labgrid.get("exporter_name", "")
-    location = labgrid.get("location", "cede-lab-bench-1")
-    pico_serial = labgrid["pico_usb_serial_short"]
-    uno_serial = labgrid["uno_usb_serial_short"]
+    exporter_name = exporter.get("name", "")
+    isolated = exporter.get("isolated", False)
 
     name_flag = f" --name {exporter_name}" if exporter_name else ""
+    isolated_flag = " --isolated" if isolated else ""
 
-    exporter_yaml = (
-        f"cede-pico-port:\n"
-        f"  location: {location}\n"
-        f"  USBSerialPort:\n"
-        f"    match:\n"
-        f"      ID_SERIAL_SHORT: '{pico_serial}'\n"
-        f"    speed: 115200\n"
-        f"\n"
-        f"cede-uno-port:\n"
-        f"  location: {location}\n"
-        f"  USBSerialPort:\n"
-        f"    match:\n"
-        f"      ID_SERIAL_SHORT: '{uno_serial}'\n"
-        f"    speed: 115200\n"
-    )
+    exporter_yaml = render_exporter_yaml(exporter)
 
     systemd_unit = (
         "[Unit]\n"
-        "Description=LabGrid Exporter (CEDE Pi Gateway)\n"
+        "Description=LabGrid Exporter (CEDE Gateway)\n"
         "After=network-online.target\n"
         "Wants=network-online.target\n"
+        "StartLimitIntervalSec=0\n"
         "\n"
         "[Service]\n"
         "Type=simple\n"
-        f"ExecStart=%h/labgrid/venv/bin/labgrid-exporter %h/labgrid/exporter.yaml -c {coord}{name_flag}\n"
-        "Restart=on-failure\n"
-        "RestartSec=5\n"
+        f"ExecStart=%h/labgrid/venv/bin/labgrid-exporter"
+        f" %h/labgrid/exporter.yaml"
+        f" --coordinator {coordinator_address}"
+        f"{name_flag}{isolated_flag}\n"
+        "Restart=always\n"
+        "RestartSec=30\n"
         "Environment=HOME=%h\n"
+        "Environment=PYTHONUNBUFFERED=1\n"
         "\n"
         "[Install]\n"
         "WantedBy=default.target\n"
@@ -167,6 +186,10 @@ def _render_labgrid_runcmd(ssh_user: str) -> str:
     """Generate cloud-init runcmd entries to create the labgrid venv and enable the exporter."""
     home = f"/home/{ssh_user}"
     cmds = [
+        '  - [ sh, -c, "mkdir -p /var/cache/labgrid && chmod 1775 /var/cache/labgrid" ]',
+        '  - [ sh, -c, "groupadd -f labgrid && chown root:labgrid /var/cache/labgrid" ]',
+        f'  - [ sh, -c, "usermod -aG labgrid,dialout,plugdev {ssh_user}" ]',
+        '  - [ sh, -c, "sysctl -w fs.protected_regular=1 fs.protected_fifos=1 || true" ]',
         f'  - [ sh, -c, "mkdir -p {home}/labgrid && python3 -m venv {home}/labgrid/venv" ]',
         f'  - [ sh, -c, "{home}/labgrid/venv/bin/pip install --no-cache-dir labgrid>=25.0" ]',
         f'  - [ sh, -c, "mkdir -p {home}/.config/systemd/user" ]',
@@ -177,6 +200,10 @@ def _render_labgrid_runcmd(ssh_user: str) -> str:
     return "\n".join(cmds)
 
 
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
 def render_cloud_init(
     repo_root: Path,
     *,
@@ -186,10 +213,15 @@ def render_cloud_init(
     timezone: str = "UTC",
     locale: str = "en_US.UTF-8",
     wifi: dict[str, str] | None = None,
+    coordinator_address: str | None = None,
+    exporter: dict | None = None,
     labgrid: dict[str, str] | None = None,
     out_dir: Path | None = None,
 ) -> tuple[Path, Path, Path]:
-    """Write user-data, meta-data, and network-config under cloud-init/rendered/."""
+    """Write user-data, meta-data, and network-config under cloud-init/rendered/.
+
+    Accepts either the new (coordinator_address + exporter) or old (labgrid) format.
+    """
     out = out_dir or (repo_root / "lab/pi/cloud-init/rendered")
     out.mkdir(parents=True, exist_ok=True)
 
@@ -203,14 +235,22 @@ def render_cloud_init(
         keys = _read_ssh_keys(authorized_keys_file)
         ssh_block = _render_optional_ssh_users_block(ssh_user, keys)
 
-    if labgrid:
-        lg_write_files = _render_labgrid_write_files(ssh_user, labgrid) + "\n"
+    has_labgrid = False
+    if exporter is not None and coordinator_address:
+        lg_write_files = _render_labgrid_write_files(ssh_user, coordinator_address, exporter) + "\n"
         lg_runcmd = _render_labgrid_runcmd(ssh_user)
-        final_msg = _LABGRID_FINAL_MSG
+        has_labgrid = True
+    elif labgrid:
+        legacy_exporter = _legacy_labgrid_to_exporter(labgrid)
+        coord = labgrid["coordinator_address"]
+        lg_write_files = _render_labgrid_write_files(ssh_user, coord, legacy_exporter) + "\n"
+        lg_runcmd = _render_labgrid_runcmd(ssh_user)
+        has_labgrid = True
     else:
         lg_write_files = ""
         lg_runcmd = ""
-        final_msg = _BASE_FINAL_MSG
+
+    final_msg = _LABGRID_FINAL_MSG if has_labgrid else _BASE_FINAL_MSG
 
     ud = ud_template
     ud = ud.replace("@@HOSTNAME@@", hostname)
@@ -232,6 +272,28 @@ def render_cloud_init(
     nc_path.write_text(_render_network_config_file(wifi), encoding="utf-8")
 
     return ud_path, md_path, nc_path
+
+
+def _legacy_labgrid_to_exporter(labgrid: dict[str, str]) -> dict:
+    """Convert the old raspberry_pi_bootstrap.labgrid dict to an exporter-style dict."""
+    return {
+        "name": labgrid.get("exporter_name", ""),
+        "location": labgrid.get("location", "cede-lab-bench-1"),
+        "resources": [
+            {
+                "group": "cede-pico-port",
+                "type": "USBSerialPort",
+                "match": {"ID_SERIAL_SHORT": labgrid["pico_usb_serial_short"]},
+                "speed": 115200,
+            },
+            {
+                "group": "cede-uno-port",
+                "type": "USBSerialPort",
+                "match": {"ID_SERIAL_SHORT": labgrid["uno_usb_serial_short"]},
+                "speed": 115200,
+            },
+        ],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

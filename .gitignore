@@ -50,6 +50,9 @@ lab/pi/logs/
 lab/pi/dist/
 lab/pi/cloud-init/rendered/
 
+# --- Generated LabGrid config artifacts (pi_bootstrap.py generate-all) ---
+env/exporters/
+
 # --- Editors & OS clutter ---
 .idea/
 .vscode/

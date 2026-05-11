@@ -345,37 +345,79 @@ CEDE uses [LabGrid](https://labgrid.readthedocs.io/) (>=25.0, gRPC) as the hardw
 
 ### Architecture
 
-- **Coordinator**: runs in the `orchestration-dev` Docker container on the Dev-Host
-- **Exporter**: runs on the Raspberry Pi gateway, exporting USB serial ports (Pico, Uno) via udev match
+- **Coordinator**: runs in the `orchestration-dev` Docker container on the Dev-Host (or standalone)
+- **Exporter(s)**: run on gateway boards (Raspberry Pi, BeagleBone, etc.), exporting USB serial ports via udev match. Multiple exporters connect to one coordinator.
 - **Client/pytest**: runs in Docker on the Dev-Host; tests use `pytest --lg-env env/remote.yaml`
+
+### Multi-exporter provisioning
+
+All exporters are declared in `lab/config/lab.yaml` under the `exporters` list. Each entry defines a gateway hostname, SSH user, OS image, and the USB serial resources it exports. A single command generates all config artifacts:
+
+```
+make lg-render-configs   # generates env/exporters/*.yaml, env/remote.yaml, places.yaml, setup_places.sh
+make lg-bootstrap-sd EXPORTER=cede-pi DEVICE=/dev/sdc   # flash an SD card for one exporter
+```
+
+Cloud-init provisions each exporter at first boot: labgrid venv, exporter YAML, systemd service, `/var/cache/labgrid`, and sysctl hardening.
 
 ### Custom extensions (`cede_labgrid/`)
 
 | Component | Description |
 |-----------|-------------|
-| `PicotoolFlashDriver` | UF2 flash via BOOTSEL mass-storage on the Pi (picotool reboot + cp) |
-| `AvrdudeFlashDriver` | HEX flash via avrdude on the Pi |
-| `CedeValidationDriver` | Serial banner + `.digest` sidecar attestation (replaces `FIRMWARE_DIGEST` plumbing) |
-| `CedeStrategy` | GraphStrategy: `off` -> `flashed` -> `validated` |
+| `PicotoolFlashDriver` | UF2 flash via `picotool load -f` (atomic reboot+load+verify), with two-step fallback for `dwc_otg` controllers |
+| `AvrdudeFlashDriver` | HEX flash via avrdude; resolves device path from `NetworkSerialPort.extra.path` in coordinator mode |
+| `CedeValidationDriver` | Serial banner + `.digest` sidecar attestation (uses `ConsoleExpectMixin`); delimiter-anchored regex for full digest match over RFC2217 |
+| `CedeResetDriver` | Soft reset: `picotool reboot` (Pico) or DTR toggle (Uno) |
+| `CedeI2CDriver` | I2C bus operations via SSH (`i2cget`, `i2cdetect`) |
+| `CedeStrategy` | GraphStrategy: `off` -> `flashed` -> `validated`; manages serial console lifecycle around flash operations |
+| `FlashProtocol` | ABC for flash drivers; strategy binds to protocol, not concrete classes |
+
+### Always-up target model
+
+LabGrid's standard model assumes targets are power-cycled between test runs.
+CEDE targets are always connected and running firmware. This difference drives
+several design decisions in the custom drivers:
+
+- **Serial port contention**: The coordinator's exporter opens an RFC2217 proxy
+  on each serial port as soon as the resource is active. Flash drivers need the
+  same port for avrdude or picotool. `CedeStrategy` explicitly deactivates the
+  `SerialDriver` before entering `state_flashed` and re-activates it for
+  `state_validated`.
+- **Cooperative BOOTSEL entry**: The `PicotoolFlashDriver` reboots the Pico into
+  BOOTSEL programmatically (`picotool load -f`). On Pi 3B's `dwc_otg` USB
+  controller, USB re-enumeration after disconnect is unreliable, so the driver
+  falls back to a two-step sequence: `picotool reboot -uf` then polling
+  `picotool load` until the device appears.
+- **NetworkSerialPort wrapping**: In coordinator mode, `USBSerialPort` resources
+  are wrapped as `NetworkSerialPort`. Drivers that need the on-gateway device
+  path (e.g. avrdude's `-P` flag) read it from `resource.extra['path']` rather
+  than `resource.port` (which becomes the TCP port number).
+- **Digest validation over RFC2217**: Serial data arrives in chunks over the TCP
+  tunnel. The validation regex anchors on a trailing whitespace delimiter
+  (`[\s\r\n]`) to ensure the full digest token is buffered before matching.
 
 ### Firmware attestation
 
-Build artifacts (UF2, HEX) are accompanied by a `.digest` sidecar file containing the embedded build token. The `CedeValidationDriver` reads the sidecar and compares with the `digest=` field in the serial banner. This replaces the `FIRMWARE_DIGEST` / `CEDE_TEST_IMAGE_ID` / `CEDE_EXPECT_DIGEST` environment-variable plumbing.
+Build artifacts (UF2, HEX) are accompanied by a `.digest` sidecar file containing the embedded build token. The `CedeValidationDriver` reads the sidecar and compares the full token against the `digest=` field in the serial banner (exact match, case-insensitive). This replaces the `FIRMWARE_DIGEST` / `CEDE_TEST_IMAGE_ID` / `CEDE_EXPECT_DIGEST` environment-variable plumbing.
 
 ### Configuration files
 
-- `env/remote.yaml` -- LabGrid environment (targets, drivers, images, imports)
-- `env/cede-pi-exporter.yaml` -- exporter config for the Pi (USB serial resource groups)
+- `env/uno.yaml`, `env/pico.yaml` -- single-target env files for pytest; use `RemotePlace` + `NetworkService` resources
+- `env/remote.yaml` -- multi-target env (all targets); used by `lg-test-all` and `lg-test-i2c`
+- `env/exporters/<name>.yaml` -- per-exporter config (USB serial resource groups) -- **generated from `lab.yaml`**
+- `places.yaml` -- place definitions with exporter/group/tag mapping -- **generated**
+- `lab/pi/scripts/setup_places.sh` -- idempotent place creation script -- **generated**
 
 ---
 
 ## 11. Future Extensions
 
+- BeagleBone gateway (second exporter profile; deferred pending bringup)
 - OTA updates for Pico W  
 - Distributed sensor nodes via MQTT  
 - Unified dashboard for all sensor streams  
 - Multi‑MCU synchronization  
-- Additional LabGrid targets (BeagleBone, ESP32)  
+- Additional LabGrid targets (ESP32, STM32)  
 - CI pipeline with LabGrid coordinator in GitHub Actions  
 
 ---

@@ -321,4 +321,8 @@ $ udevadm info /dev/ttyACM1 | grep ID_SERIAL_SHORT
 E: ID_SERIAL_SHORT=74137363737351117051  # Uno
 ```
 
-These go into `env/cede-pi-exporter.yaml` and `env/remote.yaml`.
+These go into the `resources[].match.ID_SERIAL_SHORT` fields in `lab/config/lab.yaml`. Run `make lg-render-configs` to regenerate all config artifacts.
+
+## Multi-exporter setup
+
+To add a second gateway (e.g., BeagleBone), see [multi-exporter-setup.md](multi-exporter-setup.md).

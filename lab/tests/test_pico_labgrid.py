@@ -35,7 +35,8 @@ def test_pico_console(target):
     """Verify serial console access to Pico (no flash, just read existing output)."""
     from labgrid.protocol import ConsoleProtocol
 
-    serial = target.get_active_driver(ConsoleProtocol)
+    serial = target.get_driver(ConsoleProtocol)
+    target.activate(serial)
     buf = serial.read(size=4096, timeout=5.0)
     text = buf.decode("utf-8", errors="replace") if buf else ""
     assert len(text) > 0, "No serial data received from Pico within 5s"

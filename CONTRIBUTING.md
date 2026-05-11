@@ -57,10 +57,30 @@ LabGrid tests use the coordinator/exporter infrastructure instead of direct SSH.
 | `make lg-test-uno` | Flash + validate Uno via LabGrid |
 | `make lg-test-i2c` | I2C matrix tests via LabGrid |
 | `make lg-test-all` | All LabGrid hardware tests |
+| `make lg-release-all` | Release all acquired places |
 
-These targets run inside the `orchestration-dev` container with `pytest --lg-env env/remote.yaml`. Tests are marked with `@pytest.mark.labgrid` (registered in `lab/tests/conftest.py`). The test files are `test_pico_labgrid.py`, `test_uno_labgrid.py`, and `test_i2c_labgrid.py` under `lab/tests/`.
+These targets run from the host `.venv` using per-target env files (`env/uno.yaml`, `env/pico.yaml`) with `--lg-coordinator`. Each target auto-acquires the required place on the coordinator before running. Tests are marked with `@pytest.mark.labgrid` (registered in `lab/tests/conftest.py`). The test files are `test_pico_labgrid.py`, `test_uno_labgrid.py`, and `test_i2c_labgrid.py` under `lab/tests/`.
 
-To capture serial console logs for debugging, set `LG_LOG=<dir>` on any target (e.g. `make lg-test-pico LG_LOG=tmp/lg-logs`). See [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md) for details.
+Override the coordinator address with `LG_COORDINATOR=host:port` (default: `192.168.1.111:20408`). To capture serial console logs for debugging, set `LG_LOG=<dir>` on any target (e.g. `make lg-test-pico LG_LOG=tmp/lg-logs`). See [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md) for details.
+
+#### Suppressed upstream warnings
+
+Three upstream warnings are filtered in `pyproject.toml` `[tool.pytest.ini_options]`:
+
+| Warning | Source | Reason |
+|---------|--------|--------|
+| `setDaemon()/setName() is deprecated` | pyserial 3.5 `rfc2217.py` | Uses threading APIs deprecated in Python 3.10. Fixed in pyserial main but not yet released. |
+| `__del__ called before step was done` | labgrid 25.x `step.py` | `Step` objects are GC'd before `done()` when strategy transitions deactivate drivers mid-step. Harmless; the driver operation completed. |
+
+These filters are intentional and should be revisited when pyserial >3.5 or labgrid >25.0.1 are released.
+
+#### Always-up target philosophy
+
+Unlike LabGrid's standard model (which assumes targets are power-cycled between tests), CEDE targets are always connected and running. The custom drivers handle this by:
+
+- **Deactivating the serial console** before flashing (avoids port contention with the RFC2217 proxy).
+- **Cooperative BOOTSEL entry** via `picotool reboot -uf` / `picotool load -f` instead of physical power cycling.
+- **Two-step flash fallback** for Pi 3B's `dwc_otg` USB controller, which can't reliably re-enumerate after a Pico USB disconnect.
 
 ## Code Style
 

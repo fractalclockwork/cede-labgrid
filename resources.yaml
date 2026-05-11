@@ -6,7 +6,7 @@ cede-pi:
       cls: NetworkSerialPort
       params:
         extra:
-          path: /dev/ttyACM0
+          path: /dev/ttyACM1
           proxy: cede-pi
           proxy_required: false
         host: cede-pi
@@ -19,7 +19,7 @@ cede-pi:
       cls: NetworkSerialPort
       params:
         extra:
-          path: /dev/ttyACM1
+          path: /dev/ttyACM0
           proxy: cede-pi
           proxy_required: false
         host: cede-pi

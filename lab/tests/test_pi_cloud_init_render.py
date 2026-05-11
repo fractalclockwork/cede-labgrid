@@ -23,14 +23,16 @@ def test_rendered_user_data_contains_cloud_config_and_hostname(
 ):
     cfg = pi_bootstrap.load_lab_yaml(lab_config_path)
     pi_bootstrap.validate_schema(repo_root, cfg)
+    exporters = pi_bootstrap.resolve_exporters(cfg)
+    assert exporters, "expected at least one exporter in example config"
+    hostname = exporters[0]["hostname"]
     ud_path, _md, nc_path = pi_bootstrap.render_from_lab_config(
         repo_root, cfg, cloud_init_out_dir=tmp_path
     )
     text = ud_path.read_text(encoding="utf-8")
     assert "#cloud-config" in text
     assert "enable_ssh: true" in text
-    hn = pi_bootstrap.resolve_hostname(cfg)
-    assert hn in text
+    assert hostname in text
     nc = nc_path.read_text(encoding="utf-8")
     assert "NetworkManager" in nc and "eth0:" in nc
 
@@ -40,10 +42,12 @@ def test_rendered_user_data_includes_labgrid_exporter_setup(
 ):
     cfg = pi_bootstrap.load_lab_yaml(lab_config_path)
     pi_bootstrap.validate_schema(repo_root, cfg)
-    rpb = cfg.get("raspberry_pi_bootstrap") or {}
-    lg = rpb.get("labgrid")
-    if lg is None:
-        pytest.skip("lab config has no raspberry_pi_bootstrap.labgrid section")
+    exporters = pi_bootstrap.resolve_exporters(cfg)
+    if not exporters:
+        pytest.skip("lab config has no exporters section")
+
+    exp = exporters[0]
+    coordinator_address = pi_bootstrap._resolve_coordinator_address(cfg)
 
     ud_path, _md, _nc = pi_bootstrap.render_from_lab_config(
         repo_root, cfg, cloud_init_out_dir=tmp_path
@@ -53,9 +57,10 @@ def test_rendered_user_data_includes_labgrid_exporter_setup(
     assert "ser2net" in text
     assert "write_files:" in text
     assert "labgrid-exporter" in text
-    assert lg["pico_usb_serial_short"] in text
-    assert lg["uno_usb_serial_short"] in text
-    assert lg["coordinator_address"] in text
+    for res in exp["resources"]:
+        for v in res["match"].values():
+            assert v in text
+    assert coordinator_address in text
     assert "labgrid>=25.0" in text
     assert "enable-linger" in text
 
@@ -63,14 +68,18 @@ def test_rendered_user_data_includes_labgrid_exporter_setup(
 def test_rendered_user_data_without_labgrid(
     pi_bootstrap, repo_root: Path, lab_config_path: Path, tmp_path: Path
 ):
-    """When labgrid section is absent, no exporter config is rendered."""
+    """When both exporters and raspberry_pi_bootstrap are absent, no exporter config is rendered."""
     cfg = pi_bootstrap.load_lab_yaml(lab_config_path)
     pi_bootstrap.validate_schema(repo_root, cfg)
-    rpb = cfg.get("raspberry_pi_bootstrap") or {}
-    rpb.pop("labgrid", None)
+    cfg.pop("exporters", None)
+    cfg.pop("labgrid", None)
+    cfg.pop("raspberry_pi_bootstrap", None)
 
-    ud_path, _md, _nc = pi_bootstrap.render_from_lab_config(
-        repo_root, cfg, cloud_init_out_dir=tmp_path
+    from cloud_init_render import render_cloud_init
+    ud_path, _md, _nc = render_cloud_init(
+        repo_root,
+        hostname="test-pi",
+        out_dir=tmp_path,
     )
     text = ud_path.read_text(encoding="utf-8")
 

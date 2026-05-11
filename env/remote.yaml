@@ -1,20 +1,23 @@
 # LabGrid environment for Dev-Host -> Pi exporter via coordinator.
-# Usage: pytest --lg-env env/remote.yaml lab/tests/test_pico_labgrid.py
+# Usage: pytest --lg-env env/remote.yaml --lg-coordinator HOST:PORT lab/tests/...
+#
+# For single-target testing, use env/uno.yaml or env/pico.yaml instead.
 #
 # Requires:
-#   - labgrid-coordinator running (in orchestration-dev container or standalone)
-#   - labgrid-exporter running on Pi with env/cede-pi-exporter.yaml
-#
-# Serial numbers must match exporter config (from udevadm info on the Pi).
+#   - labgrid-coordinator running
+#   - labgrid-exporter running on Pi
+#   - Places acquired: labgrid-client -p cede-uno acquire; labgrid-client -p cede-pico acquire
 
 targets:
   cede-pico:
     resources:
-      USBSerialPort:
-        match:
-          ID_SERIAL_SHORT: 'E660C06213580D29'
-        speed: 115200
+      RemotePlace:
+        name: cede-pico
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
     drivers:
+      SSHDriver: {}
       SerialDriver: {}
       PicotoolFlashDriver:
         image: 'pico_uf2'
@@ -27,11 +30,17 @@ targets:
 
   cede-uno:
     resources:
+      RemotePlace:
+        name: cede-uno
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
       USBSerialPort:
         match:
           ID_SERIAL_SHORT: '74137363737351117051'
         speed: 115200
     drivers:
+      SSHDriver: {}
       SerialDriver: {}
       AvrdudeFlashDriver:
         image: 'uno_hex'
@@ -53,10 +62,10 @@ targets:
         bus: 1
 
 images:
-  pico_uf2: 'lab/pico/hello_lab/build/hello_lab.uf2'
-  uno_hex: 'lab/uno/hello_lab/build/hello_lab.ino.hex'
-  pico_uf2_lab_stack: 'lab/pico/lab_stack/build/lab_stack.uf2'
-  uno_hex_lab_stack: 'lab/uno/lab_stack/build/lab_stack.ino.hex'
+  pico_uf2: '../lab/pico/hello_lab/build/hello_lab.uf2'
+  uno_hex: '../lab/uno/hello_lab/build/hello_lab.ino.hex'
+  pico_uf2_lab_stack: '../lab/pico/lab_stack/build/lab_stack.uf2'
+  uno_hex_lab_stack: '../lab/uno/lab_stack/build/lab_stack.ino.hex'
 
 tools:
   picotool: '/usr/bin/picotool'

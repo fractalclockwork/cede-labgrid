@@ -74,7 +74,7 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
         return self.console.write(data)
 
     @Driver.check_active
-    @step(args=["role", "image"])
+    @step()
     def validate(self) -> str:
         """Read serial output and assert banner + digest match.
 
@@ -90,7 +90,7 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
             self.role, expected_banner, expected_digest,
         )
 
-        banner_pattern = re.escape(expected_banner) + r".*?digest=([A-Za-z0-9._-]+)"
+        banner_pattern = re.escape(expected_banner) + r".*?digest=([A-Za-z0-9._-]+)[\s\r\n]"
         try:
             _, before, match, after = self.expect(banner_pattern, timeout=self.banner_timeout)
         except TIMEOUT:
@@ -102,7 +102,8 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
                 f"Got ({len(text)} chars): {text[:200]!r}"
             ) from None
 
-        actual_digest = match.group(1) if hasattr(match, "group") else ""
+        raw = match.group(1) if hasattr(match, "group") else ""
+        actual_digest = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
         if not actual_digest:
             text = _decode_expect(before) + _decode_expect(match) + _decode_expect(after)
             raise RuntimeError(
@@ -111,11 +112,13 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
                 f"Capture: {text[:200]!r}"
             )
 
-        if actual_digest.lower() != expected_digest.lower():
+        a, e = actual_digest.lower().strip(), expected_digest.lower().strip()
+        if a != e:
             raise RuntimeError(
                 f"Digest mismatch: device has digest={actual_digest!r}, "
                 f"expected digest={expected_digest!r} (from .digest sidecar)"
             )
+        logger.info("Digest validated: %s", a)
 
         logger.info(
             "Validation passed: %s banner ok, digest=%s", self.role, actual_digest
@@ -129,7 +132,8 @@ def _decode_expect(value: object) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     if hasattr(value, "group"):
-        return value.group(0)
+        raw = value.group(0)
+        return raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
     return str(value) if value else ""
 
 

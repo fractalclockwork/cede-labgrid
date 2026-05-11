@@ -1,3 +1,5 @@
+# DEPRECATED: Use `make lg-render-configs` to generate env/exporters/<name>.yaml instead.
+# This file is kept as a reference. The generated version is in env/exporters/cede-pi.yaml.
 cede-pico-port:
   location: cede-lab-bench-1
   USBSerialPort:

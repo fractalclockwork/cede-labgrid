@@ -1,0 +1,32 @@
+targets:
+  main:
+    resources:
+      RemotePlace:
+        name: cede-pico
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
+    drivers:
+      SSHDriver: {}
+      SerialDriver: {}
+      PicotoolFlashDriver:
+        image: 'pico_uf2'
+      CedeValidationDriver:
+        role: 'pico'
+        image: 'pico_uf2'
+      CedeResetDriver:
+        method: 'picotool'
+      CedeStrategy: {}
+
+images:
+  pico_uf2: '../lab/pico/hello_lab/build/hello_lab.uf2'
+  pico_uf2_lab_stack: '../lab/pico/lab_stack/build/lab_stack.uf2'
+
+tools:
+  picotool: '/usr/bin/picotool'
+
+imports:
+  - cede_labgrid.drivers.picotool_flash
+  - cede_labgrid.drivers.cede_validation
+  - cede_labgrid.drivers.cede_reset
+  - cede_labgrid.strategies.cede_strategy

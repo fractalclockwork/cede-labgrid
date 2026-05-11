@@ -14,7 +14,26 @@
         "dev_host": { "$ref": "#/$defs/hostEntry" },
         "pi": { "$ref": "#/$defs/hostEntry" }
       },
-      "required": ["dev_host", "pi"]
+      "required": ["dev_host"]
+    },
+    "labgrid": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Global LabGrid settings shared by all exporters.",
+      "required": ["coordinator_address"],
+      "properties": {
+        "coordinator_address": {
+          "type": "string",
+          "minLength": 1,
+          "description": "HOST:PORT of the labgrid-coordinator (e.g. 192.168.1.111:20408)."
+        }
+      }
+    },
+    "exporters": {
+      "type": "array",
+      "description": "LabGrid exporter definitions. Each entry provisions one gateway (Pi, BeagleBone, etc.) with its attached resources.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/exporterEntry" }
     },
     "serial": {
       "type": "object",
@@ -296,6 +315,132 @@
           "then": { "required": ["probe_address", "validation"] }
         }
       ]
+    },
+    "exporterEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "hostname", "resources"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exporter name registered with the coordinator (labgrid-exporter --name)."
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short hostname for cloud-init."
+        },
+        "ssh_user": {
+          "type": "string",
+          "minLength": 1,
+          "default": "pi",
+          "description": "SSH user on the gateway (default: pi)."
+        },
+        "ssh_host": {
+          "type": "string",
+          "description": "SSH hostname or IP. Defaults to <hostname>.local (mDNS)."
+        },
+        "location": {
+          "type": "string",
+          "description": "LabGrid location tag for grouping resources (e.g. cede-lab-bench-1)."
+        },
+        "isolated": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable LabGrid isolated mode (--isolated); forces SSH port forwarding for all resources."
+        },
+        "authorized_keys_file": {
+          "type": "string",
+          "description": "Dev-Host path to SSH public key(s) for passwordless first-boot SSH."
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC"
+        },
+        "locale": {
+          "type": "string",
+          "default": "en_US.UTF-8"
+        },
+        "os_image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "description": "HTTPS URL or path to OS image (.img or .img.xz)."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "Expected SHA256 of the downloaded image (hex)."
+            },
+            "cache_path": {
+              "type": "string",
+              "description": "Dev-Host path to cache the downloaded image."
+            }
+          },
+          "required": ["url"]
+        },
+        "wifi": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ssid": { "type": "string", "minLength": 1 },
+            "regulatory_domain": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2
+            },
+            "psk": { "type": "string" },
+            "psk_file": { "type": "string" }
+          },
+          "required": ["ssid"]
+        },
+        "resources": {
+          "type": "array",
+          "description": "Exported resource groups and their place bindings.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/exporterResource" }
+        }
+      }
+    },
+    "exporterResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "type", "match"],
+      "properties": {
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "description": "LabGrid resource group name (e.g. cede-pico-port)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["USBSerialPort"],
+          "description": "LabGrid resource type."
+        },
+        "match": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "minProperties": 1,
+          "description": "udev match properties (e.g. ID_SERIAL_SHORT)."
+        },
+        "speed": {
+          "type": "integer",
+          "default": 115200,
+          "description": "Baud rate (default 115200)."
+        },
+        "place": {
+          "type": "string",
+          "description": "LabGrid place name to create for this resource group."
+        },
+        "place_tags": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Tags to set on the place (e.g. board: pico)."
+        }
+      }
     },
     "raspberryPiBootstrap": {
       "type": "object",

@@ -16,5 +16,15 @@ dev = [
     "pillow>=10,<12",
 ]
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    # pyserial 3.5 RFC2217 uses deprecated threading APIs; fixed upstream but unreleased.
+    "ignore:setDaemon\\(\\) is deprecated:DeprecationWarning:serial.rfc2217",
+    "ignore:setName\\(\\) is deprecated:DeprecationWarning:serial.rfc2217",
+    # labgrid Step.__del__ fires when strategy transitions abort mid-step (e.g.
+    # driver deactivation during state_off). Upstream issue; harmless in practice.
+    "ignore:__del__ called before .* was done:UserWarning:labgrid.step",
+]
+
 [tool.uv]
 package = false

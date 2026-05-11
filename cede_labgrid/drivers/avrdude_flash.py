@@ -64,8 +64,25 @@ class AvrdudeFlashDriver(Driver, FlashProtocol):
         logger.info("Image synced to %s on gateway", remote_path)
         return remote_path
 
+    def _resolve_device_path(self) -> str:
+        """Get the actual device path on the gateway, handling NetworkSerialPort wrapping."""
+        extra = getattr(self.port, "extra", {}) or {}
+        path = extra.get("path")
+        if path:
+            return str(path)
+        device = getattr(self.port, "device", None)
+        if device:
+            return str(device)
+        port = getattr(self.port, "port", None)
+        if isinstance(port, str) and port.startswith("/"):
+            return port
+        raise RuntimeError(
+            f"Cannot determine device path from resource {self.port!r}; "
+            f"extra={extra}, device={getattr(self.port, 'device', 'N/A')}"
+        )
+
     def _run_avrdude(self, remote_hex: str) -> None:
-        serial_port = self.port.port
+        serial_port = self._resolve_device_path()
         cmd = (
             f"avrdude"
             f" -p {shlex.quote(self.partno)}"

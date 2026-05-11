@@ -1,0 +1,32 @@
+targets:
+  main:
+    resources:
+      RemotePlace:
+        name: cede-uno
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
+    drivers:
+      SSHDriver: {}
+      SerialDriver: {}
+      AvrdudeFlashDriver:
+        image: 'uno_hex'
+      CedeValidationDriver:
+        role: 'uno'
+        image: 'uno_hex'
+      CedeResetDriver:
+        method: 'dtr'
+      CedeStrategy: {}
+
+images:
+  uno_hex: '../lab/uno/hello_lab/build/hello_lab.ino.hex'
+  uno_hex_lab_stack: '../lab/uno/lab_stack/build/lab_stack.ino.hex'
+
+tools:
+  avrdude: '/usr/bin/avrdude'
+
+imports:
+  - cede_labgrid.drivers.avrdude_flash
+  - cede_labgrid.drivers.cede_validation
+  - cede_labgrid.drivers.cede_reset
+  - cede_labgrid.strategies.cede_strategy
