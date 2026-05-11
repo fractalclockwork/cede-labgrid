@@ -278,9 +278,10 @@ invokes `PicotoolFlashDriver` / `AvrdudeFlashDriver` and
 
 ## Infrastructure Setup (One-Time)
 
-See also: [Pi bootstrap for LabGrid](../docs/labgrid-manual-flash.md) —
-when building a fresh SD image, the cloud-init pipeline now automatically
-installs labgrid, ser2net, and the exporter systemd service.
+When building a fresh SD image, the cloud-init pipeline automatically
+installs labgrid, ser2net, and the exporter systemd service — see
+[sdcard.md](sdcard.md) and [rpi3-gateway-remote.md](rpi3-gateway-remote.md)
+for the SD card bootstrap workflow.
 
 ### Create places (coordinator must be running)
 

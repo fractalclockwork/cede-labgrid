@@ -47,6 +47,19 @@ Some tests need physical hardware (Pi, Pico, Uno). These use pytest markers and 
 
 Set `CEDE_RUN_HARDWARE_FULL=1`, `CEDE_RUN_HARDWARE_PICO=1`, or `CEDE_RUN_HARDWARE_UNO=1` to enable them. Without these variables, hardware tests are skipped automatically.
 
+### LabGrid Tests
+
+LabGrid tests use the coordinator/exporter infrastructure instead of direct SSH. They require a running coordinator and exporter (see [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md) for setup).
+
+| Command | Scope |
+|---------|-------|
+| `make lg-test-pico` | Flash + validate Pico via LabGrid |
+| `make lg-test-uno` | Flash + validate Uno via LabGrid |
+| `make lg-test-i2c` | I2C matrix tests via LabGrid |
+| `make lg-test-all` | All LabGrid hardware tests |
+
+These targets run inside the `orchestration-dev` container with `pytest --lg-env env/remote.yaml`. Tests are marked with `@pytest.mark.labgrid` (registered in `lab/tests/conftest_labgrid.py`). The test files are `test_pico_labgrid.py`, `test_uno_labgrid.py`, and `test_i2c_labgrid.py` under `lab/tests/`.
+
 ## Code Style
 
 ### Python

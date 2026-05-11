@@ -7,7 +7,7 @@ It provides a **Dev-Host–centric toolchain** (workstation, NUC, VM, or CI), a 
 
 > **Quick start:** `uv sync && make validate` runs the offline test suite. See [section 5](#5-docker-toolchains-dev-host) for Docker toolchain setup and [lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md) for the full bring-up checklist.
 
-**Deep dives:** [docs/CONTAINER_BOOTSTRAP.md](docs/CONTAINER_BOOTSTRAP.md) (pipeline stages and validation gates) · [docs/BOOT_IMAGES.md](docs/BOOT_IMAGES.md) (PC vs Pi boot artifacts) · [docs/BOOT_MEDIA_FLASH.md](docs/BOOT_MEDIA_FLASH.md) (raw image flashing) · [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) (Docker images and cross-compilers)
+**Deep dives:** [docs/CONTAINER_BOOTSTRAP.md](docs/CONTAINER_BOOTSTRAP.md) (pipeline stages and validation gates) · [docs/BOOT_IMAGES.md](docs/BOOT_IMAGES.md) (PC vs Pi boot artifacts) · [docs/BOOT_MEDIA_FLASH.md](docs/BOOT_MEDIA_FLASH.md) (raw image flashing) · [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) (Docker images and cross-compilers) · [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md) (LabGrid end-to-end walkthrough) · [CONTRIBUTING.md](CONTRIBUTING.md) (dev setup and test guide)
 
 CEDE emphasizes:
 - Reproducible builds via Docker
@@ -83,53 +83,69 @@ flowchart LR
 - `CedeStrategy` (GraphStrategy): `off` → `flashed` → `validated` state machine
 - Firmware attestation via `.digest` sidecar files (replaces `FIRMWARE_DIGEST` env-var plumbing)
 - `pytest --lg-env env/remote.yaml` replaces Make-based hardware smoke tests
+- LabGrid runs alongside the legacy SSH/rsync `pi-gateway-*` Make targets; both pipelines coexist in the Makefile
 - See `env/remote.yaml` (environment), `env/cede-pi-exporter.yaml` (exporter), `cede_labgrid/` (custom drivers/strategies)
+- End-to-end manual walkthrough: [lab/pi/docs/labgrid-manual-flash.md](lab/pi/docs/labgrid-manual-flash.md)
 
 ---
 
 ## 4. Repository Structure
 
 ```
-/docs
-  CONTAINER_BOOTSTRAP.md  # unified pipeline: containers → image deploy → hardware gates
+.github/workflows/        # CI (cede-smoke, docker-target-workflow)
+cede_labgrid/             # custom LabGrid drivers and strategies
+  drivers/
+    picotool_flash.py       # PicotoolFlashDriver (UF2 via exporter)
+    avrdude_flash.py        # AvrdudeFlashDriver (HEX via exporter)
+    cede_validation.py      # CedeValidationDriver (banner + digest sidecar)
+  strategies/
+    cede_strategy.py        # CedeStrategy (GraphStrategy: off -> flashed -> validated)
+docs/
+  CONTAINER_BOOTSTRAP.md   # unified pipeline: containers → image deploy → hardware gates
   BOOT_IMAGES.md           # PC Dev-Host vs Pi: no repo PC ISO; Pi OS .img + cloud-init vs Docker OCI
   BOOT_MEDIA_FLASH.md      # dd raw/hybrid images to SD, USB, HDD/NVMe (export-raw-dd)
   TOOLCHAINS.md            # Docker images, cross-compilers, version pins, validation gates
-/pyproject.toml          # Python deps for uv (lab validation, pi_bootstrap, labgrid)
-/uv.lock
-/Makefile                # uv sync, test-config-local, lg-test-*, legacy pi-gateway-*
-/cede_labgrid            # custom LabGrid drivers and strategies
-  /drivers
-    picotool_flash.py      # PicotoolFlashDriver (UF2 via exporter)
-    avrdude_flash.py       # AvrdudeFlashDriver (HEX via exporter)
-    cede_validation.py     # CedeValidationDriver (banner + digest sidecar)
-  /strategies
-    cede_strategy.py       # CedeStrategy (GraphStrategy: off -> flashed -> validated)
-/env                     # LabGrid environment configs
-  remote.yaml              # Dev-Host Docker -> Pi exporter via coordinator
-  cede-pi-exporter.yaml   # exporter config for Pi (USB serial resources)
-/lab
-  /config
+env/                      # LabGrid environment configs
+  remote.yaml               # Dev-Host Docker -> Pi exporter via coordinator
+  cede-pi-exporter.yaml    # exporter config for Pi (USB serial resources)
+lab/
+  config/
     lab.example.yaml
     lab.schema.json
-  /docker
-    /pico-dev
-    /arduino-dev
-    /orchestration-dev     # includes labgrid>=25.0
+  docker/
+    pico-dev/
+    arduino-dev/
+    orchestration-dev/      # includes labgrid>=25.0
+    rpi-imager/             # containerised SD card imaging
     docker-compose.yml
+    docker-compose.gateway.yml
+    docker-compose.platform-amd64.yml
+    docker-compose.platform-arm64.yml
     Makefile
     TOOLCHAIN_VERSIONS
-  /pico/hello_lab          # minimal Pico W firmware (CMake)
-  /uno/hello_lab           # minimal Uno sketch (Arduino CLI)
-  /pi
-    bootstrap.sh
-    /bootstrap            # gateway installer + cloud-init helpers
-    /cloud-init           # templates + rendered files for SD card
-    /docs                 # SD card, CLI flash, HDMI dashboard notes
-    /scripts
-  /sensors
-    catalog.yaml           # post–Hello Lab
-  /tests
+  pico/
+    hello_lab/              # minimal Pico W firmware (CMake)
+    lab_stack/              # multi-target Pico application
+  uno/
+    hello_lab/              # minimal Uno sketch (Arduino CLI)
+    lab_stack/              # multi-target Uno application
+  pi/
+    bootstrap/              # gateway installer + cloud-init helpers
+    cloud-init/             # templates + rendered files for SD card
+    docs/                   # SD card, CLI flash, serial console, LabGrid walkthrough
+    native/hello_gateway/   # aarch64 native binary for the gateway
+    scripts/
+    services/               # systemd units (placeholder)
+    ssd1306_dual/           # dual SSD1306 OLED display test
+    ssd1306_eyes/           # SSD1306 "cat eyes" animated display
+  sensors/
+    catalog.yaml            # post–Hello Lab sensor catalog (placeholder)
+  tests/
+CONTRIBUTING.md
+DESIGN.md
+Makefile                  # uv sync, test-config-local, lg-test-*, legacy pi-gateway-*
+pyproject.toml            # Python deps for uv (lab validation, pi_bootstrap, labgrid)
+uv.lock
 ```
 
 ---
@@ -179,7 +195,7 @@ Full runbook: [lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtarge
 
 **Gateway (Pi) native check:** `make pi-gateway-build-native-hello` cross-compiles **`lab/pi/native/hello_gateway`** (aarch64 in **`orchestration-dev`** on the Dev-Host). The Pi does not keep a CEDE **git** tree — `make pi-gateway-validate-gateway-native` **`rsync`s only `lab/pi` helpers** and **`scp`s the binary** to **`/tmp`**, then runs the validator (optional **`DIGEST=…`** / **`CEDE_IMAGE_ID`** for embed + compare).
 
-**Raspberry Pi gateway (e.g. Pi 3 Model B):** declare **`raspberry_pi_bootstrap`** and **`hosts.pi`** in `lab/config/lab.yaml`, then use **`uv run python lab/pi/bootstrap/pi_bootstrap.py`** (or **`python3`** after `uv sync`) to render cloud-init and flash or patch the SD card—see [lab/pi/docs/sdcard.md](lab/pi/docs/sdcard.md). **Ethernet DHCP + SSH in one patched `.img`:** [lab/pi/docs/rpi3-gateway-remote.md](lab/pi/docs/rpi3-gateway-remote.md), **`make pi-gateway-sd-ready`** (fetch/expand, **`patch-image`**, **`verify_boot_image --compare-rendered`**) — **transfer + flash playbook:** [lab/pi/docs/pi-gateway-image-transfer-flash.md](lab/pi/docs/pi-gateway-image-transfer-flash.md). Alternatively flash **64-bit Raspberry Pi OS Lite** with Imager and follow the manual paths there. For low-level CLI imaging see [lab/pi/docs/cli-flash.md](lab/pi/docs/cli-flash.md) (`flash_sdcard.sh`, `prepare_sdcard_boot.sh`). After first-boot SSH, optionally copy **`lab/pi/bootstrap/bootstrap_pi.sh`** from the Dev-Host (**`scp`**) and run **`sudo /tmp/bootstrap_pi.sh --hostname <name>`** for Docker, Arduino CLI, and group tweaks (cloud-init may already install **`picotool`** / **`avrdude`**). **Do not clone the full repo on the gateway**—use **`sync_gateway_flash_deps.sh`** / **`make pi-gateway-sync`** for Pico/Uno helpers only. Optional containerized imaging: `make -C lab/docker build-rpi-imager` and `shell-rpi-imager` (privileged `/dev` access). For an ARM64 **orchestration** image on the Pi: `make -C lab/docker setup-binfmt` (amd64 Dev-Host, once), `make -C lab/docker build-gateway-images`, and optionally `save-gateway-orchestration` to transfer to the Pi. **Pico/Uno gateway runbook:** [lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md). HDMI kiosk dashboard notes: [lab/pi/docs/dashboard-hdmi.md](lab/pi/docs/dashboard-hdmi.md).
+**Raspberry Pi gateway (e.g. Pi 3 Model B):** declare **`raspberry_pi_bootstrap`** and **`hosts.pi`** in `lab/config/lab.yaml`, then use **`uv run python lab/pi/bootstrap/pi_bootstrap.py`** (or **`python3`** after `uv sync`) to render cloud-init and flash or patch the SD card—see [lab/pi/docs/sdcard.md](lab/pi/docs/sdcard.md). **Ethernet DHCP + SSH in one patched `.img`:** [lab/pi/docs/rpi3-gateway-remote.md](lab/pi/docs/rpi3-gateway-remote.md), **`make pi-gateway-sd-ready`** (fetch/expand, **`patch-image`**, **`verify_boot_image --compare-rendered`**) — **transfer + flash playbook:** [lab/pi/docs/pi-gateway-image-transfer-flash.md](lab/pi/docs/pi-gateway-image-transfer-flash.md). Alternatively flash **64-bit Raspberry Pi OS Lite** with Imager and follow the manual paths there. For low-level CLI imaging see [lab/pi/docs/cli-flash.md](lab/pi/docs/cli-flash.md) (`flash_sdcard.sh`, `prepare_sdcard_boot.sh`). First-boot validation via GPIO UART: [lab/pi/docs/serial-console.md](lab/pi/docs/serial-console.md). After first-boot SSH, optionally copy **`lab/pi/bootstrap/bootstrap_pi.sh`** from the Dev-Host (**`scp`**) and run **`sudo /tmp/bootstrap_pi.sh --hostname <name>`** for Docker, Arduino CLI, and group tweaks (cloud-init may already install **`picotool`** / **`avrdude`**). **Do not clone the full repo on the gateway**—use **`sync_gateway_flash_deps.sh`** / **`make pi-gateway-sync`** for Pico/Uno helpers only. Optional containerized imaging: `make -C lab/docker build-rpi-imager` and `shell-rpi-imager` (privileged `/dev` access). For an ARM64 **orchestration** image on the Pi: `make -C lab/docker setup-binfmt` (amd64 Dev-Host, once), `make -C lab/docker build-gateway-images`, and optionally `save-gateway-orchestration` to transfer to the Pi. **Pico/Uno gateway runbook:** [lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md). HDMI kiosk dashboard notes: [lab/pi/docs/dashboard-hdmi.md](lab/pi/docs/dashboard-hdmi.md).
 
 ---
 

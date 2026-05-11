@@ -200,28 +200,38 @@ flowchart TD
 
 ---
 
-### 6.4 Example Directory Structure for Docker
+### 6.4 Directory Structure
 
 ```
-/lab
-  /docker
-    /pico-dev
-      Dockerfile
-    /arduino-dev
-      Dockerfile
-    /orchestration-dev
-      Dockerfile
-  /pico
-    /src
-    /build
-  /uno
-    /src
-    /build
-  /pi
-    /scripts
-    /services
-  /docs
-  /tests
+cede_labgrid/             # custom LabGrid drivers + strategies (§10)
+  drivers/
+  strategies/
+env/                      # LabGrid environment configs (remote.yaml, exporter)
+lab/
+  docker/
+    pico-dev/               # Pico SDK + ARM GCC
+    arduino-dev/            # avr-gcc + avrdude
+    orchestration-dev/      # Python + labgrid + test harness
+    rpi-imager/             # containerised SD card imaging
+    docker-compose.yml
+    docker-compose.gateway.yml
+  pico/
+    hello_lab/              # minimal Pico W firmware (CMake)
+    lab_stack/              # multi-target Pico application
+  uno/
+    hello_lab/              # minimal Uno sketch (Arduino CLI)
+    lab_stack/              # multi-target Uno application
+  pi/
+    bootstrap/              # gateway installer + cloud-init helpers
+    cloud-init/
+    docs/
+    native/hello_gateway/   # aarch64 native binary for the gateway
+    scripts/
+    services/
+    ssd1306_dual/           # dual SSD1306 OLED display test
+    ssd1306_eyes/           # SSD1306 animated display
+  sensors/
+  tests/
 ```
 
 ---
