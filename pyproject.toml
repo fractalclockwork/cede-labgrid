@@ -1,6 +1,6 @@
 [project]
 name = "cede"
-version = "0.0.0"
+version = "0.1.0"
 description = "CEDE lab tooling (lab.yaml validation, Raspberry Pi bootstrap helpers)"
 readme = "README.md"
 requires-python = ">=3.11"

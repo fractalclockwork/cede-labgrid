@@ -1,9 +1,13 @@
 # Containerized Embedded Development Environment (CEDE)
 
+**Build firmware in Docker, flash it through a Raspberry Pi gateway, and validate the result -- all from one repo with automated checks at every stage.**
+
 CEDE is a modular, reproducible, and containerized embedded systems development environment designed for multi‑MCU hardware experimentation.  
 It provides a **Dev-Host–centric toolchain** (workstation, NUC, VM, or CI), a **hardware gateway** (Raspberry Pi as the current reference), and **Pico W + Arduino Uno** microcontroller targets across 3.3 V and 5 V domains.
 
-**Base operation:** **unified containerized embedded bootstrap** — build and validate **container images** and **bootstrap payloads**, deploy **disk images** to hardware, then run **container workloads on the device**, with **checks at each stage**. See **[docs/CONTAINER_BOOTSTRAP.md](docs/CONTAINER_BOOTSTRAP.md)**. **PC vs Pi boot/runtime artifacts** (no generic PC ISO; Pi uses Raspberry Pi OS `.img` + cloud-init): **[docs/BOOT_IMAGES.md](docs/BOOT_IMAGES.md)**. **Flash raw/hybrid images to SD/USB/disk (`dd`):** **[docs/BOOT_MEDIA_FLASH.md](docs/BOOT_MEDIA_FLASH.md)** (`make export-raw-dd`). **Toolchains & cross-compilers (Docker):** [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md). **Local validation:** `make validate` (pytest under `lab/tests/`).
+> **Quick start:** `uv sync && make validate` runs the offline test suite. See [section 5](#5-docker-toolchains-dev-host) for Docker toolchain setup and [lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md) for the full bring-up checklist.
+
+**Deep dives:** [docs/CONTAINER_BOOTSTRAP.md](docs/CONTAINER_BOOTSTRAP.md) (pipeline stages and validation gates) · [docs/BOOT_IMAGES.md](docs/BOOT_IMAGES.md) (PC vs Pi boot artifacts) · [docs/BOOT_MEDIA_FLASH.md](docs/BOOT_MEDIA_FLASH.md) (raw image flashing) · [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) (Docker images and cross-compilers)
 
 CEDE emphasizes:
 - Reproducible builds via Docker
@@ -239,13 +243,12 @@ Hello Lab is defined in [DESIGN.md](DESIGN.md) §9. In order: **SSH** from Dev-H
 - Unified dashboard (Grafana)  
 - Multi‑MCU synchronization  
 - Automated hardware regression tests  
-- CI pipeline using Docker toolchains  
 
 ---
 
 ## 10. License
 
-MIT License (or your preferred license).
+[MIT License](LICENSE)
 
 ---
 
@@ -260,6 +263,4 @@ Design philosophy and Dev-Host terminology aligned with [DESIGN.md](DESIGN.md).
 
 ## 12. Authors
 
-CEDE Development Team  
-Brent Thorne
-Darren Newell
+- Brent Thorne
