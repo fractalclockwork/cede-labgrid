@@ -1,0 +1,13 @@
+cede-pico-port:
+  location: cede-lab-bench-1
+  USBSerialPort:
+    match:
+      ID_SERIAL_SHORT: 'E660C06213580D29'
+    speed: 115200
+
+cede-uno-port:
+  location: cede-lab-bench-1
+  USBSerialPort:
+    match:
+      ID_SERIAL_SHORT: '74137363737351117051'
+    speed: 115200

@@ -1,0 +1,61 @@
+# LabGrid environment for Dev-Host -> Pi exporter via coordinator.
+# Usage: pytest --lg-env env/remote.yaml lab/tests/test_pico_labgrid.py
+#
+# Requires:
+#   - labgrid-coordinator running (in orchestration-dev container or standalone)
+#   - labgrid-exporter running on Pi with env/cede-pi-exporter.yaml
+#
+# Serial numbers must match exporter config (from udevadm info on the Pi).
+
+targets:
+  cede-pico:
+    resources:
+      USBSerialPort:
+        match:
+          ID_SERIAL_SHORT: 'E660C06213580D29'
+        speed: 115200
+    drivers:
+      SerialDriver: {}
+      PicotoolFlashDriver:
+        image: 'pico_uf2'
+      CedeValidationDriver:
+        role: 'pico'
+        image: 'pico_uf2'
+      CedeStrategy: {}
+
+  cede-uno:
+    resources:
+      USBSerialPort:
+        match:
+          ID_SERIAL_SHORT: '74137363737351117051'
+        speed: 115200
+    drivers:
+      SerialDriver: {}
+      AvrdudeFlashDriver:
+        image: 'uno_hex'
+      CedeValidationDriver:
+        role: 'uno'
+        image: 'uno_hex'
+      CedeStrategy: {}
+
+  cede-pi:
+    resources:
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
+    drivers:
+      SSHDriver: {}
+
+images:
+  pico_uf2: 'lab/pico/hello_lab/build/hello_lab.uf2'
+  uno_hex: 'lab/uno/hello_lab/build/hello_lab.ino.hex'
+
+tools:
+  picotool: '/usr/bin/picotool'
+  avrdude: '/usr/bin/avrdude'
+
+imports:
+  - cede_labgrid.drivers.picotool_flash
+  - cede_labgrid.drivers.avrdude_flash
+  - cede_labgrid.drivers.cede_validation
+  - cede_labgrid.strategies.cede_strategy

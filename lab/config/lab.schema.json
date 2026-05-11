@@ -359,6 +359,38 @@
         "locale": {
           "type": "string",
           "description": "e.g. en_US.UTF-8"
+        },
+        "labgrid": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "LabGrid exporter provisioning via cloud-init. When present, first-boot installs labgrid in a venv, deploys the exporter config, and enables a systemd user service.",
+          "required": ["coordinator_address", "pico_usb_serial_short", "uno_usb_serial_short"],
+          "properties": {
+            "coordinator_address": {
+              "type": "string",
+              "minLength": 1,
+              "description": "HOST:PORT of the labgrid-coordinator (e.g. 192.168.1.111:20408)."
+            },
+            "exporter_name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Public name for the exporter (defaults to the Pi hostname)."
+            },
+            "location": {
+              "type": "string",
+              "description": "LabGrid location tag for grouping resources (e.g. cede-lab-bench-1)."
+            },
+            "pico_usb_serial_short": {
+              "type": "string",
+              "minLength": 1,
+              "description": "udev ID_SERIAL_SHORT for the Pico USB serial device."
+            },
+            "uno_usb_serial_short": {
+              "type": "string",
+              "minLength": 1,
+              "description": "udev ID_SERIAL_SHORT for the Uno USB serial device."
+            }
+          }
         }
       }
     }

@@ -7,7 +7,7 @@ DIGEST ?=
 CEDE_REPO_DIGEST := $(shell git -C $(REPO_ROOT) rev-parse --short=12 HEAD 2>/dev/null)
 FIRMWARE_DIGEST = $(if $(strip $(DIGEST)),$(DIGEST),$(CEDE_REPO_DIGEST))
 
-.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-ssd1306-dual pi-gateway-ssd1306-dual-bus-speed pi-gateway-ssd1306-eyes pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c pi-gateway-flash-test-pico-lab-stack pi-gateway-flash-test-uno-lab-stack pi-gateway-build-native-hello pi-gateway-validate-gateway-native pi-gateway-build-test-gateway-native bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline cede-dev-preflight test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img
+.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-ssd1306-dual pi-gateway-ssd1306-dual-bus-speed pi-gateway-ssd1306-eyes pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c pi-gateway-flash-test-pico-lab-stack pi-gateway-flash-test-uno-lab-stack pi-gateway-build-native-hello pi-gateway-validate-gateway-native pi-gateway-build-test-gateway-native bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline cede-dev-preflight test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img lg-test-pico lg-test-uno lg-test-i2c lg-test-all lg-console-pico lg-console-uno
 
 help:
 	@echo "Python (uv):"
@@ -70,6 +70,14 @@ help:
 	@echo "  make bootstrap-stage-pico / bootstrap-stage-uno — alias Pico-first or full Uno flash-test"
 	@echo "  make bootstrap-pipeline — workspace + gateway + Stage 0 + second MCU (ZERO_TARGET=pico: then Uno; uno: then Pico)"
 	@echo "  make cede-dev-preflight — dev readiness: bootstrap-stage-dev-host + bootstrap-stage-gateway (see lab/docs/dev-preflight.md)"
+	@echo "LabGrid (coordinator + exporter must be running; see env/remote.yaml):"
+	@echo "  make lg-test-pico      — flash + validate Pico via LabGrid (pytest --lg-env)"
+	@echo "  make lg-test-uno       — flash + validate Uno via LabGrid"
+	@echo "  make lg-test-i2c       — I2C matrix validation via LabGrid"
+	@echo "  make lg-test-all       — all LabGrid hardware tests (Pico + Uno + I2C)"
+	@echo "  make lg-console-pico   — interactive serial console to Pico via labgrid-client"
+	@echo "  make lg-console-uno    — interactive serial console to Uno via labgrid-client"
+	@echo "Legacy (SSH-based, predates LabGrid):"
 	@echo "  make pi-gateway-hello-lab-hardware-smoke — Docker rebuild hello_lab with unique digest per run, flash Pico+Uno, validate banners (not CI; needs GATEWAY + devices)"
 	@echo "  make pi-gateway-hello-lab-hardware-smoke-uno — same digest flow for Uno only (uno-build + flash-test-uno)"
 	@echo "  make pi-gateway-hello-lab-hardware-smoke-pico — same digest flow for Pico only (pico-build + flash-test-pico)"
@@ -397,3 +405,30 @@ pi-test-cloud-init:
 pi-verify-boot-img:
 	@test -n "$(IMG)" || (echo "Set IMG=lab/pi/dist/your.img" >&2; exit 1)
 	sudo "$(REPO_ROOT)/lab/pi/scripts/verify_boot_image.sh" "$(IMG)"
+
+# --- LabGrid targets (requires coordinator + exporter; see env/remote.yaml) ---
+LG_ENV ?= env/remote.yaml
+LG_COORDINATOR ?= localhost
+LG_COMPOSE = docker compose -f lab/docker/docker-compose.yml
+
+lg-test-pico:
+	cd "$(REPO_ROOT)" && $(LG_COMPOSE) run --rm orchestration-dev \
+		pytest --lg-env $(LG_ENV) -v lab/tests/test_pico_labgrid.py
+
+lg-test-uno:
+	cd "$(REPO_ROOT)" && $(LG_COMPOSE) run --rm orchestration-dev \
+		pytest --lg-env $(LG_ENV) -v lab/tests/test_uno_labgrid.py
+
+lg-test-i2c:
+	cd "$(REPO_ROOT)" && $(LG_COMPOSE) run --rm orchestration-dev \
+		pytest --lg-env $(LG_ENV) -v lab/tests/test_i2c_labgrid.py
+
+lg-test-all:
+	cd "$(REPO_ROOT)" && $(LG_COMPOSE) run --rm orchestration-dev \
+		pytest --lg-env $(LG_ENV) -v lab/tests/test_pico_labgrid.py lab/tests/test_uno_labgrid.py lab/tests/test_i2c_labgrid.py
+
+lg-console-pico:
+	labgrid-client -x $(LG_COORDINATOR) -p cede-pico console
+
+lg-console-uno:
+	labgrid-client -x $(LG_COORDINATOR) -p cede-uno console

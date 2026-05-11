@@ -1,0 +1,34 @@
+cede-pico:
+  acquired: null
+  acquired_resources: []
+  aliases: []
+  allowed: []
+  changed: 1778528699.9363635
+  comment: ''
+  created: 1778526277.1841776
+  matches:
+  - cls: '*'
+    exporter: cede-pi
+    group: cede-pico-port
+    name: null
+    rename: null
+  reservation: null
+  tags:
+    board: pico
+cede-uno:
+  acquired: null
+  acquired_resources: []
+  aliases: []
+  allowed: []
+  changed: 1778528809.4507542
+  comment: ''
+  created: 1778526278.0644183
+  matches:
+  - cls: '*'
+    exporter: cede-pi
+    group: cede-uno-port
+    name: null
+    rename: null
+  reservation: null
+  tags:
+    board: uno

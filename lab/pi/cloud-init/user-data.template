@@ -38,8 +38,11 @@ packages:
   - libusb-1.0-0
   - udev
   - usbutils
+  - ser2net
 
+@@LABGRID_WRITE_FILES@@
 runcmd:
   - [ sh, -c, "command -v raspi-config >/dev/null && raspi-config nonint do_i2c 0 || true" ]
+@@LABGRID_RUNCMD@@
 
-final_message: "CEDE cloud-init finished (SSH; picotool/avrdude/python3). Do not git clone the full repo on this gateway—for Docker + Arduino CLI, copy lab/pi/bootstrap/bootstrap_pi.sh from Dev-Host and run it; for Pico/Uno use sync_gateway_flash_deps.sh only (lab/pi/docs/pico-uno-subtargets.md)."
+final_message: "@@FINAL_MESSAGE@@"

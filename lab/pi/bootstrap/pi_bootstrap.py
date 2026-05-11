@@ -142,6 +142,19 @@ def render_from_lab_config(
             "country": str(wifi_cfg.get("regulatory_domain") or "US"),
         }
 
+    labgrid: dict[str, str] | None = None
+    lg_cfg = rpb.get("labgrid")
+    if lg_cfg and isinstance(lg_cfg, dict):
+        labgrid = {
+            "coordinator_address": str(lg_cfg["coordinator_address"]),
+            "pico_usb_serial_short": str(lg_cfg["pico_usb_serial_short"]),
+            "uno_usb_serial_short": str(lg_cfg["uno_usb_serial_short"]),
+        }
+        if lg_cfg.get("exporter_name"):
+            labgrid["exporter_name"] = str(lg_cfg["exporter_name"])
+        if lg_cfg.get("location"):
+            labgrid["location"] = str(lg_cfg["location"])
+
     return render_cloud_init(
         repo_root,
         hostname=hostname,
@@ -150,6 +163,7 @@ def render_from_lab_config(
         timezone=timezone,
         locale=locale,
         wifi=wifi,
+        labgrid=labgrid,
         out_dir=cloud_init_out_dir,
     )
 

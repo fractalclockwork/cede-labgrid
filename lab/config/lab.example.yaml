@@ -144,6 +144,17 @@ raspberry_pi_bootstrap:
     sha256: "4cd31df026fd82243805a326dc0cafd7383f7e3d30c9413e7044d507aae281e2"
     # Distinct name avoids reusing an older Bookworm .xz left in lab/pi/dist/ at the previous path.
     cache_path: "lab/pi/dist/raspios_trixie_arm64_latest.img.xz"
+  # LabGrid exporter provisioning — cloud-init creates the venv, installs labgrid + ser2net,
+  # deploys the exporter config, and enables a systemd user service on first boot.
+  # coordinator_address is the Dev-Host (or dedicated host) running labgrid-coordinator.
+  # USB serial IDs come from: udevadm info /dev/ttyACM0 | grep ID_SERIAL_SHORT
+  labgrid:
+    coordinator_address: "192.168.1.111:20408"
+    exporter_name: cede-pi
+    location: cede-lab-bench-1
+    pico_usb_serial_short: "E660C06213580D29"
+    uno_usb_serial_short: "74137363737351117051"
+
   # wifi:
   #   ssid: "my-network"
   #   regulatory_domain: "US"

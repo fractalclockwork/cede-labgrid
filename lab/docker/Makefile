@@ -204,7 +204,8 @@ pico-build:
 		cd /workspace/lab/pico/$(PICO_APP) && \
 		rm -rf build && mkdir build && cd build && \
 		cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=$(PICO_BOARD) .. && \
-		ninja \
+		ninja && \
+		grep -oP "(?<=CEDE_IMAGE_ID \")([A-Za-z0-9._-]+)" cede_build_id.h > $(PICO_APP).uf2.digest \
 	'
 
 uno-build:
@@ -213,7 +214,8 @@ uno-build:
 		cd /workspace/lab/uno/$(UNO_APP) && \
 		bash tools/gen_cede_image_id.sh && \
 		mkdir -p build && \
-		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . \
+		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . && \
+		grep -oP "(?<=CEDE_IMAGE_ID \")([A-Za-z0-9._-]+)" cede_build_id.h > build/$(UNO_APP).ino.hex.digest \
 	'
 
 # Convenience: second reference application (see lab/docs/applications.md).

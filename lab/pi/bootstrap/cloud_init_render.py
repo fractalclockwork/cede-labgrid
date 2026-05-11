@@ -87,6 +87,96 @@ def _render_network_config_file(wifi: dict[str, str] | None) -> str:
     return blob.rstrip() + "\n"
 
 
+_LABGRID_FINAL_MSG = (
+    "CEDE cloud-init finished (SSH; picotool/avrdude/python3; labgrid-exporter). "
+    "The exporter connects to the coordinator on startup."
+)
+_BASE_FINAL_MSG = (
+    "CEDE cloud-init finished (SSH; picotool/avrdude/python3). "
+    "Do not git clone the full repo on this gateway."
+)
+
+
+def _render_labgrid_write_files(
+    ssh_user: str,
+    labgrid: dict[str, str],
+) -> str:
+    """Generate cloud-init write_files entries for the exporter config and systemd unit."""
+    coord = labgrid["coordinator_address"]
+    exporter_name = labgrid.get("exporter_name", "")
+    location = labgrid.get("location", "cede-lab-bench-1")
+    pico_serial = labgrid["pico_usb_serial_short"]
+    uno_serial = labgrid["uno_usb_serial_short"]
+
+    name_flag = f" --name {exporter_name}" if exporter_name else ""
+
+    exporter_yaml = (
+        f"cede-pico-port:\n"
+        f"  location: {location}\n"
+        f"  USBSerialPort:\n"
+        f"    match:\n"
+        f"      ID_SERIAL_SHORT: '{pico_serial}'\n"
+        f"    speed: 115200\n"
+        f"\n"
+        f"cede-uno-port:\n"
+        f"  location: {location}\n"
+        f"  USBSerialPort:\n"
+        f"    match:\n"
+        f"      ID_SERIAL_SHORT: '{uno_serial}'\n"
+        f"    speed: 115200\n"
+    )
+
+    systemd_unit = (
+        "[Unit]\n"
+        "Description=LabGrid Exporter (CEDE Pi Gateway)\n"
+        "After=network-online.target\n"
+        "Wants=network-online.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f"ExecStart=%h/labgrid/venv/bin/labgrid-exporter %h/labgrid/exporter.yaml -c {coord}{name_flag}\n"
+        "Restart=on-failure\n"
+        "RestartSec=5\n"
+        "Environment=HOME=%h\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+
+    home = f"/home/{ssh_user}"
+    lines = [
+        "write_files:",
+        f"  - path: {home}/labgrid/exporter.yaml",
+        f"    owner: {ssh_user}:{ssh_user}",
+        "    permissions: '0644'",
+        "    content: |",
+    ]
+    for eline in exporter_yaml.splitlines():
+        lines.append(f"      {eline}" if eline else "")
+    lines.append(f"  - path: {home}/.config/systemd/user/labgrid-exporter.service")
+    lines.append(f"    owner: {ssh_user}:{ssh_user}")
+    lines.append("    permissions: '0644'")
+    lines.append("    content: |")
+    for sline in systemd_unit.splitlines():
+        lines.append(f"      {sline}" if sline else "")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_labgrid_runcmd(ssh_user: str) -> str:
+    """Generate cloud-init runcmd entries to create the labgrid venv and enable the exporter."""
+    home = f"/home/{ssh_user}"
+    cmds = [
+        f'  - [ sh, -c, "mkdir -p {home}/labgrid && python3 -m venv {home}/labgrid/venv" ]',
+        f'  - [ sh, -c, "{home}/labgrid/venv/bin/pip install --no-cache-dir labgrid>=25.0" ]',
+        f'  - [ sh, -c, "mkdir -p {home}/.config/systemd/user" ]',
+        f"  - [ loginctl, enable-linger, {ssh_user} ]",
+        f'  - [ su, {ssh_user}, -c, "systemctl --user daemon-reload" ]',
+        f'  - [ su, {ssh_user}, -c, "systemctl --user enable --now labgrid-exporter.service" ]',
+    ]
+    return "\n".join(cmds)
+
+
 def render_cloud_init(
     repo_root: Path,
     *,
@@ -96,6 +186,7 @@ def render_cloud_init(
     timezone: str = "UTC",
     locale: str = "en_US.UTF-8",
     wifi: dict[str, str] | None = None,
+    labgrid: dict[str, str] | None = None,
     out_dir: Path | None = None,
 ) -> tuple[Path, Path, Path]:
     """Write user-data, meta-data, and network-config under cloud-init/rendered/."""
@@ -112,11 +203,23 @@ def render_cloud_init(
         keys = _read_ssh_keys(authorized_keys_file)
         ssh_block = _render_optional_ssh_users_block(ssh_user, keys)
 
+    if labgrid:
+        lg_write_files = _render_labgrid_write_files(ssh_user, labgrid) + "\n"
+        lg_runcmd = _render_labgrid_runcmd(ssh_user)
+        final_msg = _LABGRID_FINAL_MSG
+    else:
+        lg_write_files = ""
+        lg_runcmd = ""
+        final_msg = _BASE_FINAL_MSG
+
     ud = ud_template
     ud = ud.replace("@@HOSTNAME@@", hostname)
     ud = ud.replace("@@TIMEZONE@@", timezone)
     ud = ud.replace("@@LOCALE@@", locale)
     ud = ud.replace("@@OPTIONAL_SSH_USERS@@", ssh_block)
+    ud = ud.replace("@@LABGRID_WRITE_FILES@@\n", lg_write_files)
+    ud = ud.replace("@@LABGRID_RUNCMD@@", lg_runcmd)
+    ud = ud.replace("@@FINAL_MESSAGE@@", final_msg)
 
     ud_path = out / "user-data"
     ud_path.write_text(ud, encoding="utf-8")

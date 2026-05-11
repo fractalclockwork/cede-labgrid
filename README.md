@@ -76,6 +76,15 @@ flowchart LR
 - GPIO/PWM/analog on Uno
 - USB serial for MCU‑to‑Pi communication
 
+### ✔ LabGrid Hardware Orchestration
+- [LabGrid](https://labgrid.readthedocs.io/) coordinator runs in the `orchestration-dev` Docker container on the Dev-Host
+- `labgrid-exporter` on the Pi exports USB serial ports (Pico, Uno) via udev match
+- Custom drivers: `PicotoolFlashDriver` (UF2 flash), `AvrdudeFlashDriver` (HEX flash), `CedeValidationDriver` (serial banner + digest attestation)
+- `CedeStrategy` (GraphStrategy): `off` → `flashed` → `validated` state machine
+- Firmware attestation via `.digest` sidecar files (replaces `FIRMWARE_DIGEST` env-var plumbing)
+- `pytest --lg-env env/remote.yaml` replaces Make-based hardware smoke tests
+- See `env/remote.yaml` (environment), `env/cede-pi-exporter.yaml` (exporter), `cede_labgrid/` (custom drivers/strategies)
+
 ---
 
 ## 4. Repository Structure
@@ -86,9 +95,19 @@ flowchart LR
   BOOT_IMAGES.md           # PC Dev-Host vs Pi: no repo PC ISO; Pi OS .img + cloud-init vs Docker OCI
   BOOT_MEDIA_FLASH.md      # dd raw/hybrid images to SD, USB, HDD/NVMe (export-raw-dd)
   TOOLCHAINS.md            # Docker images, cross-compilers, version pins, validation gates
-/pyproject.toml          # Python deps for uv (lab validation, pi_bootstrap)
+/pyproject.toml          # Python deps for uv (lab validation, pi_bootstrap, labgrid)
 /uv.lock
-/Makefile                # uv sync, test-config-local, pi-bootstrap-render
+/Makefile                # uv sync, test-config-local, lg-test-*, legacy pi-gateway-*
+/cede_labgrid            # custom LabGrid drivers and strategies
+  /drivers
+    picotool_flash.py      # PicotoolFlashDriver (UF2 via exporter)
+    avrdude_flash.py       # AvrdudeFlashDriver (HEX via exporter)
+    cede_validation.py     # CedeValidationDriver (banner + digest sidecar)
+  /strategies
+    cede_strategy.py       # CedeStrategy (GraphStrategy: off -> flashed -> validated)
+/env                     # LabGrid environment configs
+  remote.yaml              # Dev-Host Docker -> Pi exporter via coordinator
+  cede-pi-exporter.yaml   # exporter config for Pi (USB serial resources)
 /lab
   /config
     lab.example.yaml
@@ -96,7 +115,7 @@ flowchart LR
   /docker
     /pico-dev
     /arduino-dev
-    /orchestration-dev
+    /orchestration-dev     # includes labgrid>=25.0
     docker-compose.yml
     Makefile
     TOOLCHAIN_VERSIONS

@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir \
     pyserial \
     pytest \
     pyyaml \
-    jsonschema
+    jsonschema \
+    "labgrid>=25.0"
 
 WORKDIR /workspace

@@ -329,14 +329,44 @@ This is **version assurance for the target image**, not cryptographic signing: i
 
 ---
 
-## 10. Future Extensions
+## 10. LabGrid Integration
+
+CEDE uses [LabGrid](https://labgrid.readthedocs.io/) (>=25.0, gRPC) as the hardware orchestration layer, replacing direct SSH/rsync/scp Make targets for flash and validation workflows.
+
+### Architecture
+
+- **Coordinator**: runs in the `orchestration-dev` Docker container on the Dev-Host
+- **Exporter**: runs on the Raspberry Pi gateway, exporting USB serial ports (Pico, Uno) via udev match
+- **Client/pytest**: runs in Docker on the Dev-Host; tests use `pytest --lg-env env/remote.yaml`
+
+### Custom extensions (`cede_labgrid/`)
+
+| Component | Description |
+|-----------|-------------|
+| `PicotoolFlashDriver` | UF2 flash via BOOTSEL mass-storage on the Pi (picotool reboot + cp) |
+| `AvrdudeFlashDriver` | HEX flash via avrdude on the Pi |
+| `CedeValidationDriver` | Serial banner + `.digest` sidecar attestation (replaces `FIRMWARE_DIGEST` plumbing) |
+| `CedeStrategy` | GraphStrategy: `off` -> `flashed` -> `validated` |
+
+### Firmware attestation
+
+Build artifacts (UF2, HEX) are accompanied by a `.digest` sidecar file containing the embedded build token. The `CedeValidationDriver` reads the sidecar and compares with the `digest=` field in the serial banner. This replaces the `FIRMWARE_DIGEST` / `CEDE_TEST_IMAGE_ID` / `CEDE_EXPECT_DIGEST` environment-variable plumbing.
+
+### Configuration files
+
+- `env/remote.yaml` -- LabGrid environment (targets, drivers, images, imports)
+- `env/cede-pi-exporter.yaml` -- exporter config for the Pi (USB serial resource groups)
+
+---
+
+## 11. Future Extensions
 
 - OTA updates for Pico W  
 - Distributed sensor nodes via MQTT  
 - Unified dashboard for all sensor streams  
 - Multi‑MCU synchronization  
-- Automated regression tests for hardware  
-- CI pipeline using Docker toolchains  
+- Additional LabGrid targets (BeagleBone, ESP32)  
+- CI pipeline with LabGrid coordinator in GitHub Actions  
 
 ---
 
