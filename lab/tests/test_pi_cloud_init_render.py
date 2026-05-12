@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 @pytest.fixture
@@ -18,10 +20,30 @@ def pi_bootstrap(repo_root: Path):
     sys.path.remove(str(bootstrap_dir))
 
 
+@pytest.fixture
+def _fake_ssh_key(tmp_path: Path, lab_config_path: Path):
+    """Create a temp SSH pub key so render doesn't fail in environments without ~/.ssh/."""
+    pub = tmp_path / "ci_test_key.pub"
+    pub.write_text("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGtlc3Qga2V5 ci-test\n", encoding="utf-8")
+    return pub
+
+
+def _patch_authorized_keys(cfg: dict, pub_path: Path) -> dict:
+    """Return a deep copy of cfg with authorized_keys_file pointing at pub_path."""
+    cfg = copy.deepcopy(cfg)
+    for exp in cfg.get("exporters", []):
+        exp["authorized_keys_file"] = str(pub_path)
+    rpb = cfg.get("raspberry_pi_bootstrap")
+    if rpb and "authorized_keys_file" in rpb:
+        rpb["authorized_keys_file"] = str(pub_path)
+    return cfg
+
+
 def test_rendered_user_data_contains_cloud_config_and_hostname(
-    pi_bootstrap, repo_root: Path, lab_config_path: Path, tmp_path: Path
+    pi_bootstrap, repo_root: Path, lab_config_path: Path, tmp_path: Path, _fake_ssh_key: Path,
 ):
     cfg = pi_bootstrap.load_lab_yaml(lab_config_path)
+    cfg = _patch_authorized_keys(cfg, _fake_ssh_key)
     pi_bootstrap.validate_schema(repo_root, cfg)
     exporters = pi_bootstrap.resolve_exporters(cfg)
     assert exporters, "expected at least one exporter in example config"
@@ -38,9 +60,10 @@ def test_rendered_user_data_contains_cloud_config_and_hostname(
 
 
 def test_rendered_user_data_includes_labgrid_exporter_setup(
-    pi_bootstrap, repo_root: Path, lab_config_path: Path, tmp_path: Path
+    pi_bootstrap, repo_root: Path, lab_config_path: Path, tmp_path: Path, _fake_ssh_key: Path,
 ):
     cfg = pi_bootstrap.load_lab_yaml(lab_config_path)
+    cfg = _patch_authorized_keys(cfg, _fake_ssh_key)
     pi_bootstrap.validate_schema(repo_root, cfg)
     exporters = pi_bootstrap.resolve_exporters(cfg)
     if not exporters:

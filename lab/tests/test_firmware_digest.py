@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+
+needs_make = pytest.mark.skipif(shutil.which("make") is None, reason="make not found")
 
 
 def _load_lab_i2c_matrix(repo_root: Path, *, modname: str = "_cede_lab_i2c_matrix_validate_test") -> ModuleType:
@@ -27,6 +30,7 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+@needs_make
 def test_make_print_firmware_digest_digest_override(repo_root: Path) -> None:
     proc = subprocess.run(
         [
@@ -44,6 +48,7 @@ def test_make_print_firmware_digest_digest_override(repo_root: Path) -> None:
     assert proc.stdout.strip() == "feedface1234"
 
 
+@needs_make
 def test_make_print_firmware_digest_equals_git_when_digest_unset(repo_root: Path) -> None:
     git = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
@@ -65,6 +70,7 @@ def test_make_print_firmware_digest_equals_git_when_digest_unset(repo_root: Path
     assert proc.stdout.strip() == want
 
 
+@needs_make
 def test_make_print_firmware_digest_whitespace_digest_falls_back_to_git(repo_root: Path) -> None:
     git = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
@@ -84,6 +90,7 @@ def test_make_print_firmware_digest_whitespace_digest_falls_back_to_git(repo_roo
     assert proc.stdout.strip() == want
 
 
+@needs_make
 def test_make_print_cede_repo_digest_matches_git(repo_root: Path) -> None:
     git = subprocess.run(
         ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
