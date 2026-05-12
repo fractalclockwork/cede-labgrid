@@ -1,20 +1,7 @@
 cede-pi:
   cede-pico-port:
     USBSerialPort:
-      acquired: null
-      avail: true
-      cls: NetworkSerialPort
-      params:
-        extra:
-          path: /dev/ttyACM1
-          proxy: cede-pi
-          proxy_required: false
-        host: cede-pi
-        port: null
-        speed: 115200
-  cede-uno-port:
-    USBSerialPort:
-      acquired: null
+      acquired: cede-pico
       avail: true
       cls: NetworkSerialPort
       params:
@@ -23,5 +10,18 @@ cede-pi:
           proxy: cede-pi
           proxy_required: false
         host: cede-pi
-        port: null
+        port: 51007
+        speed: 115200
+  cede-uno-port:
+    USBSerialPort:
+      acquired: cede-uno
+      avail: true
+      cls: NetworkSerialPort
+      params:
+        extra:
+          path: /dev/ttyACM1
+          proxy: cede-pi
+          proxy_required: false
+        host: cede-pi
+        port: 33493
         speed: 115200

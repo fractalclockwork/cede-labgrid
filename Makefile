@@ -423,7 +423,7 @@ lg-test-uno: lg-acquire-uno
 	$(LG_PYTEST) --lg-env env/uno.yaml -v lab/tests/test_uno_labgrid.py
 
 lg-test-i2c:
-	$(LG_PYTEST) --lg-env env/remote.yaml -v lab/tests/test_i2c_labgrid.py
+	$(LG_PYTEST) --lg-env env/pi.yaml -v lab/tests/test_i2c_labgrid.py
 
 lg-test-all: lg-acquire-pico lg-acquire-uno
 	$(LG_PYTEST) --lg-env env/remote.yaml -v \

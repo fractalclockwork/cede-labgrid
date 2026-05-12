@@ -58,10 +58,11 @@ This remains the baseline for flashing and serial validators.
   - LV pull-ups to `3.3V`
   - HV pull-ups to `5V`
 - Avoid stacked strong pull-ups from multiple modules.
+- **TXS0108E OE pin must be tied to VCCA (3.3 V)** — a floating OE causes intermittent bus failures.
 - Preflight before tests:
   - SDA/SCL idle high on both sides
   - no stuck-low lines
-  - bus scan sees only expected responders
+  - bus scan sees only expected responders (`0x42`, `0x43`)
 
 ### I2C bring-up defaults
 
@@ -103,7 +104,9 @@ Optional Pi-only smoke (both addresses from the Pi): **`make pi-gateway-validate
 
 **Troubleshooting Pi→Uno:** If **0x43** *Read failed*, reflash Uno (**`make pi-gateway-flash-test-uno-i2c`**) and check **A4/A5** / HV shifter. **`make pi-gateway-diagnose-i2c`** should show **43** in the grid.
 
-**Intermittent Uno / flaky `i2cdetect`:** The Raspberry Pi **broadcom** I2C master can **time out** if a slave **holds SCL low** (clock stretching) longer than the controller allows. The Arduino **Uno** TWI ISR shares CPU time with **UART** (USB serial): noisy **`hello_lab`** banners increased UART interrupts and made **0x43** drop off scans intermittently. Firmware **throttles** the periodic digest banner; **D13** blinks from a **Timer1 ISR** (not **`loop()`**) so **`loop()`** stays Serial / banners only and **`Wire`** sees less contention with **`delay()`**. On the Pi you can also slow the bus for margin, e.g. in **`/boot/firmware/config.txt`** set **`dtparam=i2c_arm_baudrate=50000`** (default is often **100000**) and reboot. With **SSD1306** or other chatty devices on the same bus, pause OLED demos during **`i2cdetect`** / **`i2cget`** checks so SDA/SCL are not contested during refresh.
+**TXS0108E level shifter — OE must be tied high.** If **0x43** (or **0x42**) drops off `i2cdetect` intermittently, check the **OE** (output-enable) pin on the **TXS0108E** level shifter. A floating OE causes the shifter to randomly enable and disable its outputs, making I2C devices appear and disappear from scans. **Tie OE to VCCA (3.3 V)** for reliable operation. This was the root cause of early "flaky Uno TWI" symptoms — the ATmega328P TWI peripheral is reliable when the level shifter is properly configured.
+
+**Serial output and I2C:** The `hello_lab` firmware prints its banner only once at startup (Uno) or on DTR connect (Pico), then stays silent. No periodic serial output competes with the TWI/I2C ISR. The **D13** LED blinks from a **Timer1 ISR** (not `loop()`), keeping `loop()` free for serial commands only. With **SSD1306** or other chatty devices on the same bus, pause OLED demos during **`i2cdetect`** / **`i2cget`** checks so SDA/SCL are not contested during refresh.
 
 ## 4) SPI pin-to-pin wiring
 

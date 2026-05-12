@@ -1,0 +1,13 @@
+targets:
+  main:
+    resources:
+      NetworkService:
+        address: 'cede-pi.local'
+        username: 'pi'
+    drivers:
+      SSHDriver: {}
+      CedeI2CDriver:
+        bus: 1
+
+imports:
+  - cede_labgrid.drivers.cede_i2c

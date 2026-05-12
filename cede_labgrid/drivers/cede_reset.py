@@ -46,7 +46,7 @@ class CedeResetDriver(Driver):
     post_reset_delay = attr.ib(default=2.0, validator=attr.validators.instance_of(float))
 
     @Driver.check_active
-    @step(args=["method"])
+    @step()
     def reset(self) -> None:
         """Reset the target MCU."""
         if self.method == "picotool":

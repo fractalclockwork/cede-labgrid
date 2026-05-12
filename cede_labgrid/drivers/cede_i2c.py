@@ -1,8 +1,11 @@
 """CedeI2CDriver -- probe I2C slave registers on the Pi gateway via SSH.
 
 Runs ``i2cget`` on the Pi through the LabGrid SSHDriver, providing a clean
-driver interface for I2C bus validation in tests.  The bus and target
-addresses are configured in ``env/remote.yaml``.
+driver interface for I2C bus validation in tests.  Configured in ``env/pi.yaml``.
+
+The hello_lab firmware on each MCU exposes an I2C slave (Pico @0x42,
+Uno @0x43) through a TXS0108E level shifter.  Ensure the shifter's OE
+pin is tied to VCCA for reliable operation.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ class CedeI2CDriver(Driver):
     bus = attr.ib(default=1, validator=attr.validators.instance_of(int))
 
     @Driver.check_active
-    @step(args=["bus"])
+    @step()
     def i2cget(self, addr: int, reg: int) -> int:
         """Read a single byte from *addr* register *reg* on the configured bus."""
         cmd = f"sudo i2cget -y {self.bus} {addr:#x} {reg} b"
@@ -45,7 +48,7 @@ class CedeI2CDriver(Driver):
         return int(raw, 16)
 
     @Driver.check_active
-    @step(args=["bus"])
+    @step()
     def i2cdetect(self) -> str:
         """Run i2cdetect and return the raw output table."""
         cmd = f"sudo i2cdetect -y {self.bus}"
