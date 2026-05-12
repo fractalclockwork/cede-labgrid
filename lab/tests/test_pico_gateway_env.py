@@ -56,7 +56,7 @@ def test_hello_lab_prints_rp2_banner(repo_root: Path) -> None:
     assert "stdio_init_all" in text
     assert "CEDE hello_lab rp2 ok" in text
     assert "digest=" in text and "CEDE_IMAGE_ID" in text
-    assert "CEDE i2c pico_to_uno ok" in text
+    assert "CEDE i2c peer_probe ok" in text
 
 
 @pytest.mark.parametrize(

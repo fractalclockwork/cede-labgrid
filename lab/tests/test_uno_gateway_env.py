@@ -65,7 +65,7 @@ def test_uno_hello_lab_sketch_has_serial_banner(repo_root: Path) -> None:
     assert "Serial.begin(115200)" in text
     assert "CEDE hello_lab ok" in text
     assert "digest=" in text
-    assert "CEDE i2c uno_to_pico ok" in text
+    assert "CEDE i2c peer_probe ok" in text
 
 
 def test_sync_gateway_deps_includes_uno_scripts(repo_root: Path) -> None:

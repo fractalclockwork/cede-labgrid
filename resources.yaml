@@ -10,7 +10,7 @@ cede-pi:
           proxy: cede-pi
           proxy_required: false
         host: cede-pi
-        port: 51007
+        port: 47059
         speed: 115200
   cede-uno-port:
     USBSerialPort:

@@ -19,6 +19,7 @@ Run:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,11 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_DIR = REPO_ROOT / "lab" / "pi" / "bootstrap"
+
+_SKIP_MSG = (
+    "Set CEDE_RUN_SD_IMAGE=1 to run SD image pipeline tests "
+    "(needs network + disk space + sudo for patch-image)."
+)
 
 
 def _ensure_importable() -> None:
@@ -47,25 +53,31 @@ def lab_cfg() -> Path:
 @pytest.mark.labgrid
 def test_fetch_image(lab_cfg):
     """Download the compressed Pi OS image (skipped if already cached)."""
+    if os.environ.get("CEDE_RUN_SD_IMAGE") != "1":
+        pytest.skip(_SKIP_MSG)
     _ensure_importable()
     from pi_bootstrap import cmd_fetch_image
 
-    cmd_fetch_image(REPO_ROOT, lab_cfg, force=False)
+    cmd_fetch_image(REPO_ROOT, lab_cfg, force=False, exporter_name=None)
 
 
 @pytest.mark.labgrid
 def test_expand_image(lab_cfg):
     """Decompress the .xz to a raw .img (skipped if already expanded)."""
+    if os.environ.get("CEDE_RUN_SD_IMAGE") != "1":
+        pytest.skip(_SKIP_MSG)
     _ensure_importable()
     from pi_bootstrap import cmd_expand_image
 
-    cmd_expand_image(REPO_ROOT, lab_cfg, force=False)
+    cmd_expand_image(REPO_ROOT, lab_cfg, force=False, exporter_name=None)
 
 
 @pytest.mark.labgrid
 def test_render_cloud_init(lab_cfg):
     """Render cloud-init templates (user-data, meta-data, network-config)."""
+    if os.environ.get("CEDE_RUN_SD_IMAGE") != "1":
+        pytest.skip(_SKIP_MSG)
     _ensure_importable()
     from pi_bootstrap import cmd_render
 
-    cmd_render(REPO_ROOT, lab_cfg)
+    cmd_render(REPO_ROOT, lab_cfg, exporter_name=None)

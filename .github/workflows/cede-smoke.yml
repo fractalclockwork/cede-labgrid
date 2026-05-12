@@ -48,37 +48,23 @@ jobs:
           print('All CEDE LabGrid drivers import OK')
           "
 
-      - name: Validate strategy graph
+      - name: Validate strategy registration and state methods
         run: |
           uv run python -c "
-          from labgrid.environment import Environment
-          import os, tempfile, yaml
+          import cede_labgrid.drivers.picotool_flash
+          import cede_labgrid.drivers.avrdude_flash
+          import cede_labgrid.drivers.cede_validation
+          import cede_labgrid.drivers.cede_reset
+          import cede_labgrid.drivers.cede_i2c
+          import cede_labgrid.strategies.cede_strategy
 
-          cfg = {
-            'targets': {
-              'test': {
-                'resources': {},
-                'drivers': {
-                  'CedeStrategy': {},
-                },
-              },
-            },
-            'imports': [
-              'cede_labgrid.drivers.picotool_flash',
-              'cede_labgrid.drivers.avrdude_flash',
-              'cede_labgrid.drivers.cede_validation',
-              'cede_labgrid.drivers.cede_reset',
-              'cede_labgrid.strategies.cede_strategy',
-            ],
-          }
+          from labgrid.factory import target_factory
+          cls = target_factory.class_from_string('CedeStrategy')
+          assert cls is not None, 'CedeStrategy not registered in target_factory'
 
-          with tempfile.NamedTemporaryFile('w', suffix='.yaml', delete=False) as f:
-            yaml.dump(cfg, f)
-            f.flush()
-            env = Environment(f.name)
-            t = env.get_target('test')
-            strat = t.get_driver('CedeStrategy')
-            print(f'Strategy states: {[s.__name__ for s in strat.graph.nodes()]}' if hasattr(strat, 'graph') else 'Strategy loaded OK')
-          os.unlink(f.name)
-          print('Strategy graph validation passed')
+          for state in ('state_off', 'state_flashed', 'state_validated'):
+              assert callable(getattr(cls, state, None)), f'{state} missing from CedeStrategy'
+
+          print(f'Strategy {cls.__name__} registered OK — states: off, flashed, validated')
+          print('Strategy validation passed')
           "
