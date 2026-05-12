@@ -8,7 +8,7 @@ jobs:
   docker-targets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: QEMU binfmt (amd64 host → arm64 Dockerfile RUN steps)
         run: |

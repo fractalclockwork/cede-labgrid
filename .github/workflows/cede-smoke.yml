@@ -9,7 +9,10 @@ jobs:
   docker-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: QEMU binfmt (amd64 host → arm64 builds)
+        run: docker run --privileged --rm tonistiigi/binfmt --install all
 
       - name: Build images and run smoke checks
         run: |
@@ -28,10 +31,10 @@ jobs:
   labgrid-import:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8
 
       - name: Install deps
         run: uv sync
