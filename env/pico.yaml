@@ -20,7 +20,7 @@ targets:
 
 images:
   pico_uf2: '../lab/pico/hello_lab/build/hello_lab.uf2'
-  pico_uf2_lab_stack: '../lab/pico/lab_stack/build/lab_stack.uf2'
+  pico_uf2_i2c_hello: '../demo_apps/pico/i2c_hello/build/i2c_hello.uf2'
 
 tools:
   picotool: '/usr/bin/picotool'

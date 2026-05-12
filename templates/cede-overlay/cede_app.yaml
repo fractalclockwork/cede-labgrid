@@ -1,0 +1,7 @@
+# CEDE application manifest — declares this project to the CEDE environment.
+application_id: {{APP_NAME}}
+target: {{CEDE_TARGET}}
+entrypoint: build/*.uf2
+resources:
+  usb_serial:
+    banner_prefix: "{{APP_NAME}} ok"

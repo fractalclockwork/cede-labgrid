@@ -75,26 +75,10 @@
         "uno_hex_glob": { "type": "string" },
         "logs_dir": { "type": "string" },
         "test_results_dir": { "type": "string" },
-        "lab_stack_pico_build": { "type": "string" },
-        "lab_stack_pico_uf2_glob": { "type": "string" },
-        "lab_stack_uno_build": { "type": "string" },
-        "lab_stack_uno_hex_glob": { "type": "string" },
-        "ssd1306_dual_pi_app": {
-          "type": "string",
-          "description": "Pi gateway application tree (Python) for ssd1306_dual."
-        },
-        "ssd1306_dual_pi_main_glob": {
-          "type": "string",
-          "description": "Glob for the Pi app entrypoint under ssd1306_dual_pi_app (e.g. main.py)."
-        },
-        "ssd1306_eyes_pi_app": {
-          "type": "string",
-          "description": "Pi gateway application tree (Python) for ssd1306_eyes."
-        },
-        "ssd1306_eyes_pi_main_glob": {
-          "type": "string",
-          "description": "Glob for the Pi app entrypoint under ssd1306_eyes_pi_app (e.g. main.py)."
-        }
+        "i2c_hello_pico_build": { "type": "string" },
+        "i2c_hello_pico_uf2_glob": { "type": "string" },
+        "i2c_hello_uno_build": { "type": "string" },
+        "i2c_hello_uno_hex_glob": { "type": "string" }
       }
     },
     "applications": {
@@ -209,11 +193,11 @@
           "properties": {
             "build_key": {
               "type": "string",
-              "enum": ["pico_build", "uno_build", "lab_stack_pico_build", "lab_stack_uno_build"]
+              "enum": ["pico_build", "uno_build", "i2c_hello_pico_build", "i2c_hello_uno_build"]
             },
             "artifact_glob_key": {
               "type": "string",
-              "enum": ["pico_uf2_glob", "uno_hex_glob", "lab_stack_pico_uf2_glob", "lab_stack_uno_hex_glob"]
+              "enum": ["pico_uf2_glob", "uno_hex_glob", "i2c_hello_pico_uf2_glob", "i2c_hello_uno_hex_glob"]
             }
           }
         },

@@ -1,2 +1,4 @@
 build/
+*.hex
+*.elf
 cede_build_id.h

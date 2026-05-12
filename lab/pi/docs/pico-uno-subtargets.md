@@ -2,7 +2,7 @@
 
 Use this runbook **after** gateway bootstrapping has passed its **E2E** checks (patched `.img`, verify, flash, SSH). Pico/Uno flashing assumes a sane Pi OS gateway and a working **`ssh`** session — not half-repaired cloud-init.
 
-**Applications (multi-target firmware):** **[lab/docs/applications.md](../../docs/applications.md)** — e.g. **`lab_stack`**, **`cede_app.yaml`**, **`make pi-gateway-flash-test-pico-lab-stack`**. **Deploy E2E:** [deploy-lab-stack-app.md](../../docs/deploy-lab-stack-app.md).
+**Applications (multi-target firmware):** **[lab/docs/applications.md](../../docs/applications.md)** — e.g. **`i2c_hello`**, **`cede_app.yaml`**, **`make lg-test-pico-i2c-hello`**. **Deploy E2E:** [deploy-lab-stack-app.md](../../docs/deploy-lab-stack-app.md).
 
 **Development preflight (goal-driven gate):** **[lab/docs/dev-preflight.md](../../docs/dev-preflight.md)** — **`make cede-dev-preflight`** chains workspace toolchains + gateway health + subtarget checks before feature work.
 

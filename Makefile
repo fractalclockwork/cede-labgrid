@@ -7,9 +7,15 @@ DIGEST ?=
 CEDE_REPO_DIGEST := $(shell git -C $(REPO_ROOT) rev-parse --short=12 HEAD 2>/dev/null)
 FIRMWARE_DIGEST = $(if $(strip $(DIGEST)),$(DIGEST),$(CEDE_REPO_DIGEST))
 
-.PHONY: help sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-ssd1306-dual pi-gateway-ssd1306-dual-bus-speed pi-gateway-ssd1306-eyes pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c pi-gateway-flash-test-pico-lab-stack pi-gateway-flash-test-uno-lab-stack pi-gateway-build-native-hello pi-gateway-validate-gateway-native pi-gateway-build-test-gateway-native bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline cede-dev-preflight test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img lg-test-pico lg-test-uno lg-test-i2c lg-test-all lg-console-pico lg-console-uno lg-acquire-pico lg-acquire-uno lg-release-all lg-render-configs lg-render-cloud-init lg-bootstrap-sd lg-setup-places lg-verify-exporter flash-test-pico flash-test-uno flash-test-all
+.PHONY: help new-app cede-deploy sync sync-pi-gateway-flash-deps pi-gateway-sync pi-gateway-health pi-gateway-subtarget-check pi-gateway-print-serial pi-gateway-resolve-port-uno pi-gateway-resolve-port-pico pi-gateway-flash-uno pi-gateway-flash-pico pi-gateway-validate-uno pi-gateway-validate-pico pi-gateway-validate-pico-i2c pi-gateway-validate-uno-i2c pi-gateway-validate-i2c-pi-to-pico pi-gateway-validate-i2c-pi-to-uno pi-gateway-validate-i2c-from-lab pi-gateway-validate-i2c-both pi-gateway-diagnose-i2c pi-gateway-flash-test-uno pi-gateway-flash-test-pico pi-gateway-flash-test-pico-i2c pi-gateway-flash-test-uno-i2c pi-gateway-flash-test-pico-lab-stack pi-gateway-flash-test-uno-lab-stack pi-gateway-build-native-hello pi-gateway-validate-gateway-native pi-gateway-build-test-gateway-native bootstrap-stage-dev-host bootstrap-stage-gateway bootstrap-stage-zero bootstrap-stage-zero-pico bootstrap-stage-zero-uno bootstrap-stage-pico bootstrap-stage-uno bootstrap-pipeline cede-dev-preflight test-config-local validate docker-test-arch docker-workflow docker-workflow-print test-emulated-docker emulation-environments-test container-test-baseline pi-bootstrap-render pi-fetch-expand pi-raw-sd-image pi-raw-sd-image-force pi-gateway-img-patch pi-gateway-verify-boot pi-gateway-sd-ready pi-gateway-sd-ready-force export-raw-dd pi-dd-flash pi-test-cloud-init pi-verify-boot-img lg-test-pico lg-test-uno lg-test-i2c lg-test-all lg-console-pico lg-console-uno lg-acquire-pico lg-acquire-uno lg-release-all lg-render-configs lg-render-cloud-init lg-bootstrap-sd lg-setup-places lg-verify-exporter flash-test-pico flash-test-uno flash-test-all
 
 help:
+	@echo "Application scaffolding:"
+	@echo "  make new-app NAME=my_sensor TARGET=pico OUTPUT=~/src/my_sensor — standalone Pico app"
+	@echo "  make new-app NAME=my_display TARGET=uno OUTPUT=~/src/my_display — standalone Uno app"
+	@echo "    Add CEDE=1 to include CEDE integration (containerized build, gateway flash, tests)"
+	@echo "    See docs/APP_DEVELOPMENT.md and docs/GLOSSARY.md"
+	@echo ""
 	@echo "Python (uv):"
 	@echo "  make sync              — uv sync (creates .venv, installs deps from uv.lock)"
 	@echo "  make validate          — uv sync + full lab/tests pytest (config, cloud-init, toolchain pins)"
@@ -37,56 +43,47 @@ help:
 	@echo "Pi emulate / pre-SD: lab/pi/emulate/README.md"
 	@echo "Pi SD (needs sudo + terminal): patch-image, flash-file — see lab/pi/docs/cli-flash.md"
 	@echo "Pico/Uno flash from Pi (SSH on Pi): make -C lab/pi help — lab/pi/docs/pico-uno-subtargets.md"
-	@echo "Pico/Uno from dev-host (SSH into Pi, no shell on Pi):"
-	@echo "  make pi-gateway-health | pi-gateway-subtarget-check | pi-gateway-print-serial — remote checks"
-	@echo "  make pi-gateway-resolve-port-uno — print cede-uno tty chosen on the gateway"
-	@echo "  make pi-gateway-resolve-port-pico — print cede-rp2 (Pico) tty on the gateway"
-	@echo "  make pi-gateway-flash-uno [PORT=/dev/tty…] [HEX=path] [SKIP_SYNC=1] — PORT omitted: gateway resolves"
-	@echo "  make pi-gateway-flash-pico [UF2=path] [PICO_BOOTSEL_ONLY=1] [PICO_WAIT_MOUNT=…] [SKIP_SYNC=1] — cede-rp2 UF2 (default mount poll ≈3s on Pi; raise if desktop needs automount)"
-	@echo "  make pi-gateway-validate-uno [PORT=…] [DIGEST=…] — Uno serial banner + digest= (default: git rev-parse --short=12 HEAD)"
-	@echo "  make pi-gateway-validate-pico [PORT=…] [DIGEST=…] — Pico serial banner + digest= (same default)"
-	@echo "  make pi-gateway-build-native-hello — cross-build lab/pi/native/hello_gateway (aarch64) in Docker"
-	@echo "  make pi-gateway-validate-gateway-native [GATEWAY_NATIVE_BIN=…] [DIGEST=…] — scp binary, ssh run, check digest= stdout"
-	@echo "  make pi-gateway-build-test-gateway-native — build + validate-gateway-native (needs GATEWAY)"
-	@echo "  make pi-gateway-flash-test-uno [PORT=…] — flash then validate Uno"
-	@echo "  make pi-gateway-flash-test-uno-i2c — flash Uno then serial + I2C reg0 @ UNO_I2C_ADDR (default 0x43)"
-	@echo "  make pi-gateway-flash-test-pico [UF2=…] [PICO_BOOTSEL_ONLY=1] — flash then validate cede-rp2"
-	@echo "  make pi-gateway-flash-test-pico-i2c — flash Pico then serial + Pi→Pico i2cget (same target)"
-	@echo "  make pi-gateway-flash-test-pico-lab-stack / pi-gateway-flash-test-uno-lab-stack — lab_stack app (see lab/docs/deploy-lab-stack-app.md)"
-	@echo "  I2C matrix (lab/pi/docs/bus-wiring.md; pair.validation in lab.yaml is source of truth):"
-	@echo "    make pi-gateway-validate-i2c-from-lab — run all enabled rows (CEDE_LAB_CONFIG or lab/config/lab.yaml)"
-	@echo "    make pi-gateway-validate-i2c-pi-to-pico — Pi i2cget @0x42 then Pico USB banner + digest (alias: pi-gateway-validate-pico-i2c)"
-	@echo "    make pi-gateway-validate-i2c-pi-to-uno — Pi i2cget @0x43 then Uno USB banner + digest (alias: pi-gateway-validate-uno-i2c)"
-	@echo "  make pi-gateway-validate-i2c-both — Pi i2cget 0x42 + 0x43 then Pico and Uno USB banners + digest"
-	@echo "  make pi-gateway-diagnose-i2c — ssh: i2cdetect -y bus"
-	@echo "  make pi-gateway-ssd1306-dual [SKIP_SYNC=1] — sync + ssh: dual SSD1306 demo on gateway (Ctrl+C stops)"
-	@echo "  make pi-gateway-ssd1306-dual-bus-speed [SSD1306_SPEED_DURATION=15] — dual SSD1306 I2C throughput benchmark on gateway"
-	@echo "  make pi-gateway-ssd1306-eyes [SKIP_SYNC=1] [SSD1306_EYES_EXTRA_ARGS='…'] — cartoon eyes on gateway (extra args → Pi make ssd1306-eyes-run)"
-	@echo "  Staged bootstrap — see lab/docs/staged-bootstrap.md"
-	@echo "  make bootstrap-stage-dev-host — workspace: config pytest + Docker pico-build + uno-build (no device flash)"
-	@echo "  make bootstrap-stage-gateway — prerequisite: pi-gateway-health + subtarget-check (needs SSH)"
-	@echo "  make bootstrap-stage-zero — Stage 0: flash ONE MCU + unique firmware attestation (ZERO_TARGET=pico|uno)"
-	@echo "    BOOTSTRAP_ZERO_I2C=1 — after Pico flash, also i2cget reg 0 @ 0x42"
-	@echo "  make bootstrap-stage-pico / bootstrap-stage-uno — alias Pico-first or full Uno flash-test"
-	@echo "  make bootstrap-pipeline — workspace + gateway + Stage 0 + second MCU (ZERO_TARGET=pico: then Uno; uno: then Pico)"
-	@echo "  make cede-dev-preflight — dev readiness: bootstrap-stage-dev-host + bootstrap-stage-gateway (see lab/docs/dev-preflight.md)"
+	@echo "Deploy (cede_app.yaml is the interface — see docs/APP_DEVELOPMENT.md):"
+	@echo "  make cede-deploy APP=<path>           — deploy any app (reads cede_app.yaml)"
+	@echo "  Demo apps: make cede-deploy APP=demo_apps/<app>"
+	@echo "  MCU deploy uses LabGrid; Pi apps use rsync+SSH"
+	@echo ""
 	@echo "LabGrid (coordinator + exporter must be running; see env/remote.yaml):"
-	@echo "  make lg-test-pico      — flash + validate Pico via LabGrid (auto-acquires place)"
-	@echo "  make lg-test-uno       — flash + validate Uno via LabGrid (auto-acquires place)"
-	@echo "  make lg-test-i2c       — I2C matrix validation via LabGrid"
+	@echo "  make lg-test-pico      — flash + validate Pico (auto-acquires place)"
+	@echo "  make lg-test-uno       — flash + validate Uno (auto-acquires place)"
+	@echo "  make lg-test-i2c       — I2C matrix validation via CedeI2CDriver"
 	@echo "  make lg-test-all       — all LabGrid hardware tests (Pico + Uno + I2C)"
-	@echo "  make lg-console-pico   — interactive serial console to Pico via labgrid-client"
-	@echo "  make lg-console-uno    — interactive serial console to Uno via labgrid-client"
+	@echo "  make lg-test-pico-i2c-hello / lg-test-uno-i2c-hello — i2c_hello demo app"
+	@echo "  make lg-console-pico   — interactive serial console to Pico"
+	@echo "  make lg-console-uno    — interactive serial console to Uno"
 	@echo "  make lg-release-all    — release all acquired places"
 	@echo "  LG_COORDINATOR=host:port — coordinator address (default: 192.168.1.111:20408)"
-	@echo "  LG_LOG=tmp/lg-logs     — set on any lg-test-* to capture serial console logs"
-	@echo "Legacy (SSH-based, predates LabGrid — prefer lg-* equivalents):"
-	@echo "  make pi-gateway-hello-lab-hardware-smoke — Docker rebuild hello_lab with unique digest per run, flash Pico+Uno, validate banners (not CI; needs GATEWAY + devices)"
-	@echo "  make pi-gateway-hello-lab-hardware-smoke-uno — same digest flow for Uno only (uno-build + flash-test-uno)"
-	@echo "  make pi-gateway-hello-lab-hardware-smoke-pico — same digest flow for Pico only (pico-build + flash-test-pico)"
-	@echo "  make sync-pi-gateway-flash-deps / pi-gateway-sync — rsync only lab/pi Makefile + scripts (Pi has no full repo; UF2/HEX/hello_gateway come from Dev-Host scp)"
-	@echo "    Uno-only: UNO_ONLY=1 make pi-gateway-sync GATEWAY=…"
-	@echo "    Pi repo path: omit GATEWAY_REPO_ROOT for ~/cede on Pi; or quote — GATEWAY_REPO_ROOT='~/src/cede' (unquoted ~/… expands to dev-host home in GNU Make)"
+	@echo "  LG_LOG=tmp/lg-logs     — capture serial console logs"
+	@echo ""
+	@echo "Staged bootstrap — see lab/docs/staged-bootstrap.md:"
+	@echo "  make bootstrap-stage-dev-host — workspace: config pytest + Docker pico-build + uno-build"
+	@echo "  make bootstrap-stage-gateway  — pi-gateway-health + subtarget-check (needs SSH)"
+	@echo "  make bootstrap-pipeline       — full pipeline (workspace + gateway + flash both MCUs)"
+	@echo "  make cede-dev-preflight       — dev readiness check"
+	@echo ""
+	@echo "SSH escape hatch (when LabGrid coordinator/exporter not running):"
+	@echo "  make pi-gateway-health | pi-gateway-subtarget-check — remote checks"
+	@echo "  make pi-gateway-flash-pico [UF2=…] — flash Pico via SSH+scp"
+	@echo "  make pi-gateway-flash-uno [HEX=…]  — flash Uno via SSH+scp"
+	@echo "  make pi-gateway-validate-pico | pi-gateway-validate-uno — serial banner check"
+	@echo "  make pi-gateway-sync — rsync lab/pi scripts to gateway"
+
+# --- Application scaffolding (see docs/APP_DEVELOPMENT.md) ---
+NAME ?=
+TARGET ?=
+OUTPUT ?=
+new-app:
+	@bash "$(REPO_ROOT)/scripts/new-app.sh" --name "$(NAME)" --target "$(TARGET)" --output "$(OUTPUT)" $(if $(filter 1,$(CEDE)),--cede,)
+
+# Deploy any app that has a cede_app.yaml to its target (see scripts/cede-deploy.sh).
+APP ?=
+cede-deploy:
+	@bash "$(REPO_ROOT)/scripts/cede-deploy.sh" "$(APP)" $(if $(GATEWAY),--gateway "$(GATEWAY)",) --run $(if $(EXTRA_ARGS),--extra-args "$(EXTRA_ARGS)",)
 
 # Push minimal Pi-gateway files for `make -C lab/pi flash-uno` / subtarget-check (see lab/pi/scripts/sync_gateway_flash_deps.sh).
 # Shared cd + GATEWAY env for lab/pi/scripts/devhost_pi_gateway.sh (keep parity across pi-gateway-* targets).
@@ -155,14 +152,9 @@ pi-gateway-flash-test-pico-i2c:
 	@$(MAKE) pi-gateway-flash-test-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(UF2)" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)" PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)"
 	@$(MAKE) pi-gateway-validate-i2c-pi-to-pico GATEWAY="$(GATEWAY)" I2C_BUS="$(I2C_BUS)" PICO_I2C_ADDR="$(PICO_I2C_ADDR)"
 
-# lab_stack application (lab/pico/lab_stack, lab/uno/lab_stack): build with make -C lab/docker pico-build-lab-stack uno-build-lab-stack
-pi-gateway-flash-test-pico-lab-stack:
-	@$(MAKE) pi-gateway-flash-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" UF2="$(REPO_ROOT)/lab/pico/lab_stack/build/lab_stack.uf2" PICO_BOOTSEL_ONLY="$(PICO_BOOTSEL_ONLY)" PICO_WAIT_MOUNT="$(PICO_WAIT_MOUNT)" SKIP_SYNC="$(SKIP_SYNC)"
-	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" CEDE_RUN_RECORD=1 CEDE_APPLICATION_ID=lab_stack CEDE_RUN_TRANSPORT=usb_serial PICO_SERIAL_EXPECT="CEDE lab_stack rp2 ok" $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
-
-pi-gateway-flash-test-uno-lab-stack:
-	@$(MAKE) pi-gateway-flash-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" HEX="$(REPO_ROOT)/lab/uno/lab_stack/build/lab_stack.ino.hex" PORT="$(PORT)" SKIP_SYNC="$(SKIP_SYNC)"
-	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" PORT="$(PORT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" CEDE_RUN_RECORD=1 CEDE_APPLICATION_ID=lab_stack CEDE_RUN_TRANSPORT=usb_serial UNO_SERIAL_EXPECT="CEDE lab_stack ok" $(if $(strip $(DIGEST)),DIGEST="$(DIGEST)",)
+# i2c_hello demo — prefer: make lg-test-pico-i2c-hello / lg-test-uno-i2c-hello
+pi-gateway-flash-test-pico-lab-stack: lg-test-pico-i2c-hello
+pi-gateway-flash-test-uno-lab-stack: lg-test-uno-i2c-hello
 
 # aarch64 hello_gateway for Raspberry Pi OS 64-bit (see lab/pi/native/hello_gateway; lab/docker/Makefile gateway-native-hello-build).
 # Embed id must match FIRMWARE_DIGEST (git short on host by default). orchestration-dev has no git unless we pass -e CEDE_IMAGE_ID.
@@ -183,18 +175,13 @@ pi-gateway-build-test-gateway-native:
 I2C_BUS ?= 1
 PICO_I2C_ADDR ?= 0x42
 UNO_I2C_ADDR ?= 0x43
-pi-gateway-validate-pico-i2c: pi-gateway-validate-i2c-pi-to-pico
-pi-gateway-validate-uno-i2c: pi-gateway-validate-i2c-pi-to-uno
+# I2C — prefer: make lg-test-i2c (uses CedeI2CDriver via LabGrid)
+pi-gateway-validate-pico-i2c: lg-test-i2c
+pi-gateway-validate-uno-i2c: lg-test-i2c
+pi-gateway-validate-i2c-pi-to-pico: lg-test-i2c
+pi-gateway-validate-i2c-pi-to-uno: lg-test-i2c
 
-pi-gateway-validate-i2c-pi-to-pico:
-	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cget -y $(I2C_BUS) $(PICO_I2C_ADDR) 0 b"
-	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
-
-pi-gateway-validate-i2c-pi-to-uno:
-	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cget -y $(I2C_BUS) $(UNO_I2C_ADDR) 0 b"
-	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
-
-# Single bring-up path: reads i2c_matrix.pairs[].validation (controller + mode) from lab config.
+# Single bring-up path (legacy): reads i2c_matrix.pairs[].validation from lab config.
 ONLY_I2C_PAIR ?=
 pi-gateway-validate-i2c-from-lab:
 	cd "$(REPO_ROOT)" && \
@@ -209,27 +196,10 @@ pi-gateway-validate-i2c-from-lab:
 	  $(if $(strip $(ONLY_I2C_PAIR)),--only "$(ONLY_I2C_PAIR)",) \
 	  $(if $(filter 1,$(I2C_VALIDATE_DRY_RUN)),--dry-run,)
 
-# Small gap between probes avoids some slaves missing the second START; Uno must run current hello_lab (I2C @ 0x43).
-pi-gateway-validate-i2c-both:
-	@cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "set -e; printf 'Pico %s reg0: ' '$(PICO_I2C_ADDR)'; sudo i2cget -y $(I2C_BUS) $(PICO_I2C_ADDR) 0 b; sleep 0.25; printf 'Uno %s reg0: ' '$(UNO_I2C_ADDR)'; sudo i2cget -y $(I2C_BUS) $(UNO_I2C_ADDR) 0 b" \
-		|| { printf '%s\n' "Uno did not ACK at $(UNO_I2C_ADDR). Reflash Uno hello_lab (I2C moved from 0x42 to 0x43): make pi-gateway-flash-test-uno-i2c GATEWAY=$(GATEWAY)" >&2; exit 1; }
-	@$(MAKE) pi-gateway-validate-pico GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 PICO_VALIDATE_WAIT="$(PICO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
-	@$(MAKE) pi-gateway-validate-uno GATEWAY="$(GATEWAY)" GATEWAY_REPO_ROOT="$(GATEWAY_REPO_ROOT)" SKIP_SYNC=1 UNO_VALIDATE_WAIT="$(UNO_VALIDATE_WAIT)" $(if $(PORT),PORT="$(PORT)",)
-
+# Legacy — prefer: make lg-test-i2c
+pi-gateway-validate-i2c-both: lg-test-i2c
 pi-gateway-diagnose-i2c:
 	cd "$(REPO_ROOT)" && ssh "$(GATEWAY)" "sudo i2cdetect -y $(I2C_BUS) 2>/dev/null || { echo 'i2cdetect failed (install i2c-tools? i2c enabled in raspi-config?)' >&2; exit 1; }"
-
-# Dual SSD1306 on gateway I2C — sync flash deps (includes lab/pi/ssd1306_dual), then venv + run on Pi.
-pi-gateway-ssd1306-dual:
-	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-dual-run $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
-
-SSD1306_SPEED_DURATION ?= 10
-pi-gateway-ssd1306-dual-bus-speed:
-	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" SSD1306_SPEED_DURATION="$(SSD1306_SPEED_DURATION)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-dual-bus-speed $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
-
-SSD1306_EYES_EXTRA_ARGS ?=
-pi-gateway-ssd1306-eyes:
-	@$(DEVHOST_GATEWAY_BASE) SKIP_SYNC="$(SKIP_SYNC)" SSD1306_EYES_EXTRA_ARGS="$(SSD1306_EYES_EXTRA_ARGS)" bash lab/pi/scripts/devhost_pi_gateway.sh ssd1306-eyes-run $(if $(filter 1,$(SKIP_SYNC)),--no-sync,)
 
 # --- Staged bootstrap (lab/docs/staged-bootstrap.md) ---
 # Stage 0 = first hardware gate: flash one device + unique firmware response (serial; optional I2C for Pico).
@@ -426,8 +396,9 @@ lg-test-i2c:
 	$(LG_PYTEST) --lg-env env/pi.yaml -v lab/tests/test_i2c_labgrid.py
 
 lg-test-all: lg-acquire-pico lg-acquire-uno
-	$(LG_PYTEST) --lg-env env/remote.yaml -v \
-		lab/tests/test_pico_labgrid.py lab/tests/test_uno_labgrid.py lab/tests/test_i2c_labgrid.py
+	$(LG_PYTEST) --lg-env env/pico.yaml -v lab/tests/test_pico_labgrid.py
+	$(LG_PYTEST) --lg-env env/uno.yaml -v lab/tests/test_uno_labgrid.py
+	$(LG_PYTEST) --lg-env env/pi.yaml -v lab/tests/test_i2c_labgrid.py
 
 lg-console-pico:
 	.venv/bin/labgrid-client -x $(LG_COORDINATOR) -p cede-pico console
@@ -445,11 +416,15 @@ lg-release-all:
 	@.venv/bin/labgrid-client -x $(LG_COORDINATOR) -p cede-pico release 2>/dev/null || true
 	@.venv/bin/labgrid-client -x $(LG_COORDINATOR) -p cede-uno release 2>/dev/null || true
 
-lg-test-pico-lab-stack: lg-acquire-pico
+lg-test-pico-i2c-hello: lg-acquire-pico
 	$(LG_PYTEST) --lg-env env/pico.yaml -v lab/tests/test_lab_stack_labgrid.py -k pico
 
-lg-test-uno-lab-stack: lg-acquire-uno
+lg-test-uno-i2c-hello: lg-acquire-uno
 	$(LG_PYTEST) --lg-env env/uno.yaml -v lab/tests/test_lab_stack_labgrid.py -k uno
+
+# Legacy aliases
+lg-test-pico-lab-stack: lg-test-pico-i2c-hello
+lg-test-uno-lab-stack: lg-test-uno-i2c-hello
 
 # --- LabGrid config generation and exporter bootstrap ---
 PI_BOOTSTRAP = python3 lab/pi/bootstrap/pi_bootstrap.py

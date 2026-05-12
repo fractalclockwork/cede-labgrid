@@ -1,0 +1,57 @@
+# CEDE integration targets — included by the project Makefile via:
+#   -include cede/Makefile.cede
+#
+# Provides containerized builds, gateway flash/deploy, and hardware tests.
+# Remove this file (and cede/, tests/, cede_app.yaml) to drop all CEDE
+# dependency and return to a standalone project.
+
+# --- Configuration ---
+PICO_IMAGE    ?= cede/pico-dev:local
+ARDUINO_IMAGE ?= cede/arduino-dev:local
+GATEWAY       ?= pi@cede-pi.local
+PICO_BOARD    ?= pico
+
+# Detect target type from cede_app.yaml (pico or uno).
+CEDE_TARGET := $(shell grep -oP '(?<=target:\s)\w+' cede_app.yaml 2>/dev/null)
+
+# --- Containerized build ---
+.PHONY: docker-build docker-clean
+
+ifeq ($(CEDE_TARGET),pico)
+docker-build:
+	@mkdir -p build
+	docker run --rm -v "$(CURDIR)":/app -w /app \
+	  $(PICO_IMAGE) bash -lc \
+	  'cd build && cmake -DPICO_BOARD=$(PICO_BOARD) .. && make'
+
+else ifeq ($(CEDE_TARGET),uno)
+# arduino-cli requires directory name == .ino filename.
+SKETCH_NAME := $(notdir $(CURDIR))
+docker-build:
+	docker run --rm -v "$(CURDIR)":/sketch/$(SKETCH_NAME) -w /sketch/$(SKETCH_NAME) \
+	  $(ARDUINO_IMAGE) bash -lc \
+	  'arduino-cli compile --fqbn arduino:avr:uno --output-dir build .'
+
+endif
+
+docker-clean:
+	rm -rf build
+
+# --- Gateway flash / validate ---
+.PHONY: gateway-flash gateway-validate
+
+gateway-flash: docker-build
+	@echo "Flashing to gateway $(GATEWAY) ..."
+ifeq ($(CEDE_TARGET),pico)
+	scp build/*.uf2 "$(GATEWAY):/tmp/"
+	ssh "$(GATEWAY)" 'picotool load -f -v -x /tmp/*.uf2'
+else ifeq ($(CEDE_TARGET),uno)
+	scp build/*.hex "$(GATEWAY):/tmp/"
+	ssh "$(GATEWAY)" 'avrdude -p atmega328p -c arduino -b 115200 -P $$(ls /dev/serial/by-id/usb-Arduino* 2>/dev/null | head -1) -U flash:w:/tmp/*.hex:i'
+endif
+
+# --- Hardware tests ---
+.PHONY: test
+
+test:
+	pytest tests/ -v

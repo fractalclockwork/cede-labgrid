@@ -12,7 +12,7 @@
 
 #include "cede_build_id.h"
 
-/* CEDE lab_stack (RP2040): same harness behavior as hello_lab (USB + I2C @0x42); banner identifies app. */
+/* CEDE i2c_hello (RP2040): USB serial banner + I2C slave @0x42 demo. */
 
 #define HELLO_I2C_INSTANCE i2c0
 #define HELLO_I2C_SDA_PIN 0u
@@ -30,7 +30,7 @@ static struct {
   bool mem_address_written;
 } i2c_ctx;
 
-bi_decl(bi_program_description("CEDE lab_stack: USB smoke + I2C target"));
+bi_decl(bi_program_description("CEDE i2c_hello: USB + I2C slave demo"));
 
 static void i2c_slave_handler(i2c_inst_t *i2c, i2c_slave_event_t event) {
   switch (event) {
@@ -107,7 +107,7 @@ int main(void) {
   gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
   sleep_ms(1500);
-  printf("CEDE lab_stack rp2 ok digest=%s (i2c 0x42 @ GP0/1; uno lab_stack 0x43; send m for pico→uno I2C test)\n",
+  printf("CEDE i2c_hello rp2 ok digest=%s (i2c 0x42 @ GP0/1; send m for pico->uno I2C test)\n",
          CEDE_IMAGE_ID);
   fflush(stdout);
 
@@ -126,9 +126,8 @@ int main(void) {
 
     ms_since_banner += 500;
     if (ms_since_banner >= 3000) {
-      printf(
-          "CEDE lab_stack rp2 ok digest=%s (i2c 0x42 @ GP0/1; uno lab_stack 0x43; send m for pico→uno I2C test)\n",
-          CEDE_IMAGE_ID);
+      printf("CEDE i2c_hello rp2 ok digest=%s (i2c 0x42 @ GP0/1; send m for pico->uno I2C test)\n",
+             CEDE_IMAGE_ID);
       fflush(stdout);
       ms_since_banner = 0;
     }

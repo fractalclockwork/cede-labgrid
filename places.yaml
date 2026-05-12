@@ -7,7 +7,7 @@ cede-pico:
     - USBSerialPort
   aliases: []
   allowed: []
-  changed: 1778537581.529311
+  changed: 1778611491.0420666
   comment: ''
   created: 1778526277.1841776
   matches:
@@ -28,7 +28,7 @@ cede-uno:
     - USBSerialPort
   aliases: []
   allowed: []
-  changed: 1778537551.9842217
+  changed: 1778611491.8525524
   comment: ''
   created: 1778526278.0644183
   matches:

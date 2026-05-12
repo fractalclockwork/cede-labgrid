@@ -12,16 +12,32 @@ The gateway keeps **only** a **sparse** tree (**`sync_gateway_flash_deps.sh`** �
 
 Use this section as the **operator index** after imaging **cede-pi** and wiring Pico/Uno. Order: **workspace → gateway → MCUs → I2C → (optional) gateway native**. **`GATEWAY`** defaults to **`pi@cede-pi.local`** in root **`Makefile`**; override when needed. **`unset DIGEST`** before smoke targets if your shell still exports an old **`DIGEST=`**.
 
-### Copy-paste: end-to-end bench validation (`hello_lab`)
+### Copy-paste: end-to-end bench validation (LabGrid — preferred)
 
-Run from the **repository root** on the Dev-Host. Requires SSH to **`GATEWAY`**, USB from Pi → Pico and Pi → Uno, and I2C harness per **[bus-wiring.md](../pi/docs/bus-wiring.md)** for the matrix step.
+Run from the **repository root** on the Dev-Host. Requires LabGrid coordinator + exporter running, USB from Pi → Pico and Pi → Uno, and I2C harness per **[bus-wiring.md](../pi/docs/bus-wiring.md)** for the I2C step.
+
+```bash
+export DIG=$(git rev-parse --short=12 HEAD)
+
+# Embed digest in firmware
+make -C lab/docker pico-build uno-build CEDE_IMAGE_ID="$DIG"
+
+# Flash + validate both MCUs via LabGrid
+make lg-test-all
+
+# I2C bus validation via LabGrid CedeI2CDriver
+make lg-test-i2c
+```
+
+### Copy-paste: end-to-end bench validation (SSH escape hatch)
+
+Use when LabGrid coordinator/exporter not running. Requires SSH to **`GATEWAY`**.
 
 ```bash
 export DIG=$(git rev-parse --short=12 HEAD)
 export GATEWAY=pi@cede-pi.local
 export GATEWAY_REPO_ROOT='~/cede'
 
-# Embed digest in firmware — Docker may not see .git; without this, banners can show digest=unknown and flash+validate fails.
 make -C lab/docker pico-build uno-build CEDE_IMAGE_ID="$DIG"
 
 make pi-gateway-health GATEWAY="$GATEWAY"
@@ -29,18 +45,12 @@ make pi-gateway-subtarget-check GATEWAY="$GATEWAY"
 
 make pi-gateway-flash-test-pico GATEWAY="$GATEWAY"
 make pi-gateway-flash-test-uno GATEWAY="$GATEWAY"
-
-make pi-gateway-validate-i2c-from-lab \
-  GATEWAY="$GATEWAY" \
-  GATEWAY_REPO_ROOT="$GATEWAY_REPO_ROOT" \
-  CEDE_LAB_CONFIG="$(pwd)/lab/config/lab.example.yaml"
 ```
 
 **Notes:**
 
 - **`GATEWAY_REPO_ROOT`** must be the sparse flash-deps root on the Pi (default **`~/cede`**) so remote **`python3 lab/pi/scripts/…`** paths resolve. Quote **`'~/cede'`** so GNU Make does not expand **`~`** on the Dev-Host.
-- Optional quick bus-only check without the full matrix driver: **`ssh "$GATEWAY" 'sudo i2cget -y 1 0x42 0 b && sudo i2cget -y 1 0x43 0 b'`** (adjust bus **`1`** if your **`linux_bus`** differs).
-- If **`pi-gateway-validate-i2c-from-lab`** exits non-zero despite **`i2cget`** succeeding, see serial-attestation / SSH quirks; USB **`pi-gateway-flash-test-*`** passing above already validates the primary firmware path.
+- The **`lg-*`** targets are preferred over **`pi-gateway-*`** equivalents — they use LabGrid's `ManagedFile` (content-addressed caching), proper driver lifecycle, and don't require a sparse tree on the Pi.
 
 ### 1. Dev-Host workspace (no USB hardware)
 
@@ -65,13 +75,14 @@ make pi-gateway-validate-i2c-from-lab \
 
 ### 3. MCU targets — flash + serial **`digest=`** attestation
 
-Build on Dev-Host first (**`make -C lab/docker pico-build`** / **`uno-build`**) or rely on paths from §1. Pass **`CEDE_IMAGE_ID=$(git rev-parse --short=12 HEAD)`** into those Docker builds so the UF2/HEX embed the same token the validators expect (see **Copy-paste** above).
+Build on Dev-Host first (**`make -C lab/docker pico-build`** / **`uno-build`**) or rely on paths from §1. Pass **`CEDE_IMAGE_ID=$(git rev-parse --short=12 HEAD)`** into those Docker builds so the UF2/HEX embed the same token the validators expect.
 
-| Target | Flash + serial validate (default **digest** = dev-host **git** short) |
-|--------|-----------------------------------------------------------------------|
-| **Pico (cede-rp2)** | **`make pi-gateway-flash-test-pico GATEWAY=pi@cede-pi.local`** |
-| **Uno (cede-uno)** | **`make pi-gateway-flash-test-uno GATEWAY=pi@cede-pi.local`** |
-| Serial only (already flashed) | **`make pi-gateway-validate-pico`** / **`make pi-gateway-validate-uno`** optional **`DIGEST=…`** **`PORT=…`** |
+| Target | LabGrid (preferred) | SSH escape hatch |
+|--------|---------------------|------------------|
+| **Pico (cede-rp2)** | **`make lg-test-pico`** | **`make pi-gateway-flash-test-pico GATEWAY=…`** |
+| **Uno (cede-uno)** | **`make lg-test-uno`** | **`make pi-gateway-flash-test-uno GATEWAY=…`** |
+| Both + I2C | **`make lg-test-all`** | **`make pi-gateway-flash-test-pico && make pi-gateway-flash-test-uno`** |
+| Serial only | `make lg-console-pico` / `lg-console-uno` | **`make pi-gateway-validate-pico`** / **`…-uno`** |
 
 **Pass:** banner lines contain **`digest=`** matching **`DIGEST`** when set, else repo git short; validators print **`digest-banner:`**.
 
@@ -81,11 +92,9 @@ Requires **`i2c-tools`** on **cede-pi**, wiring per **[bus-wiring.md](../pi/docs
 
 | Goal | Command |
 |------|---------|
-| All enabled rows from **`lab.yaml`** / **`lab.example.yaml`** | **`make pi-gateway-validate-i2c-from-lab GATEWAY=pi@cede-pi.local GATEWAY_REPO_ROOT='~/cede' CEDE_LAB_CONFIG="$(pwd)/lab/config/lab.example.yaml"`** — **`GATEWAY_REPO_ROOT`** required so SSH **`cd ~/cede`** resolves **`lab/pi/scripts`** on the Pi |
-| Pi → Pico then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-pico`** (alias **`pi-gateway-validate-pico-i2c`**) |
-| Pi → Uno then USB banner + digest | **`make pi-gateway-validate-i2c-pi-to-uno`** (alias **`pi-gateway-validate-uno-i2c`**) |
-| Both addresses + both USB banners | **`make pi-gateway-validate-i2c-both`** |
-| Flash one MCU + Pi **i2cget** | **`make pi-gateway-flash-test-pico-i2c`** / **`…-uno-i2c`** |
+| **LabGrid (preferred):** both Pico + Uno I2C probes | **`make lg-test-i2c`** (uses `CedeI2CDriver`, no raw SSH) |
+| Legacy: all enabled rows from **`lab.yaml`** | **`make pi-gateway-validate-i2c-from-lab …`** |
+| Legacy: diagnose bus | **`make pi-gateway-diagnose-i2c`** |
 
 ### 5. Gateway native check (aarch64 **hello_gateway** on **cede-pi**)
 
@@ -247,6 +256,7 @@ Optional second-channel check on Pico Stage 0: **`BOOTSTRAP_ZERO_I2C=1`** (see S
 
 ## Related docs
 
-- [pico-uno-subtargets.md](../pi/docs/pico-uno-subtargets.md) — flash/resolve/validate details.
+- [pico-uno-subtargets.md](../pi/docs/pico-uno-subtargets.md) — SSH escape hatch flash/resolve/validate details.
 - [bus-wiring.md](../pi/docs/bus-wiring.md) — I2C for second-channel attestation.
 - [CONTAINER_BOOTSTRAP.md](../../docs/CONTAINER_BOOTSTRAP.md) — container/image north star.
+- [APP_DEVELOPMENT.md](../../docs/APP_DEVELOPMENT.md) — application scaffolding and LabGrid-first deployment.

@@ -1,0 +1,9 @@
+build/
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+*.o
+*.d

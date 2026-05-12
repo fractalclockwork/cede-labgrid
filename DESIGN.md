@@ -217,10 +217,8 @@ lab/
     docker-compose.gateway.yml
   pico/
     hello_lab/              # minimal Pico W firmware (CMake)
-    lab_stack/              # multi-target Pico application
   uno/
     hello_lab/              # minimal Uno sketch (Arduino CLI)
-    lab_stack/              # multi-target Uno application
   pi/
     bootstrap/              # gateway installer + cloud-init helpers
     cloud-init/
@@ -228,10 +226,15 @@ lab/
     native/hello_gateway/   # aarch64 native binary for the gateway
     scripts/
     services/
-    ssd1306_dual/           # dual SSD1306 OLED display test
-    ssd1306_eyes/           # SSD1306 animated display
   sensors/
   tests/
+demo_apps/
+  pico/
+    i2c_hello/              # I2C slave + serial banner demo (Pico)
+  uno/
+    i2c_hello/              # I2C slave + serial banner demo (Uno)
+  pi/
+    ssd1306_eyes/           # OLED animation demo (Pi gateway)
 ```
 
 ---
@@ -307,7 +310,7 @@ RESP:{"imu":{"ax":0.12,"ay":0.03,"az":9.81}}
 - **Expose at runtime:** The running firmware prints a line that includes **`digest=<id>`** on the USB serial banner (same transport as §8).  
 - **Assert in validation:** Dev‑Host and Pi scripts read the banner and compare **`digest=`** to the **expected** value for that step (Makefile **`DIGEST`**, **`--digest`** on serial validators, and matrix flows that re‑read USB after I2C checks). A mismatch fails fast instead of attributing bus or sensor errors to the wrong binary.
 
-This is **version assurance for the target image**, not cryptographic signing: it ties **observed runtime behavior** to **the intended build identity** for repeatability and regression isolation. Operational detail, smoke targets, stale‑`DIGEST` caveats, and the **validation command checklist** (workspace, gateway, MCUs, I2C, gateway native, smoke) live in **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)**. **Daily development preflight** (`make cede-dev-preflight`): **[lab/docs/dev-preflight.md](lab/docs/dev-preflight.md)**. **Full E2E bench validation** (copy-paste script: Docker **`CEDE_IMAGE_ID`**, **`pi-gateway-flash-test-*`**, I2C matrix): **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)** (*Copy-paste: end-to-end bench validation*). **Multi-target applications** (`hello_lab`, `lab_stack`, manifests, `applications` in lab config): **[lab/docs/applications.md](lab/docs/applications.md)**. Flash/resolve details: **[lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md)**.
+This is **version assurance for the target image**, not cryptographic signing: it ties **observed runtime behavior** to **the intended build identity** for repeatability and regression isolation. Operational detail, smoke targets, stale‑`DIGEST` caveats, and the **validation command checklist** (workspace, gateway, MCUs, I2C, gateway native, smoke) live in **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)**. **Daily development preflight** (`make cede-dev-preflight`): **[lab/docs/dev-preflight.md](lab/docs/dev-preflight.md)**. **Full E2E bench validation** (copy-paste script: Docker **`CEDE_IMAGE_ID`**, **`pi-gateway-flash-test-*`**, I2C matrix): **[lab/docs/staged-bootstrap.md](lab/docs/staged-bootstrap.md)** (*Copy-paste: end-to-end bench validation*). **Multi-target applications** (`hello_lab`, `i2c_hello`, manifests, `applications` in lab config): **[lab/docs/applications.md](lab/docs/applications.md)**. Flash/resolve details: **[lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md)**.
 
 ### Test 1 — Dev-Host ↔ Pi SSH  
 - Confirm remote editing and file sync

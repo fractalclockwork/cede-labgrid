@@ -1,10 +1,8 @@
-# Per-application manifest (v0): Pi gateway — dual OLED eyes animation.
+# CEDE application manifest — everything cede-labgrid needs to know about this app.
 application_id: ssd1306_eyes
 target: pi
-requires:
-  lab_paths:
-    build_key: ssd1306_eyes_pi_app
-    artifact_glob_key: ssd1306_eyes_pi_main_glob
+entrypoint: main.py
+gateway: pi@cede-pi.local
 resources:
   i2c_oled:
     linux_bus: 1

@@ -54,7 +54,7 @@ def main() -> int:
     p.add_argument(
         "--application-id",
         default="",
-        help="Logical application id (e.g. lab_stack); optional",
+        help="Logical application id (e.g. i2c_hello); optional",
     )
     p.add_argument(
         "--transport-path",

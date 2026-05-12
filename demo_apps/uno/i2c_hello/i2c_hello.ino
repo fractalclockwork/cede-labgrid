@@ -1,7 +1,7 @@
 /*
- * CEDE lab_stack (Arduino Uno): USB banner + I2C slave @0x43 — paired with lab/pico/lab_stack (see cede_app.yaml).
+ * CEDE i2c_hello (Arduino Uno): USB serial banner + I2C slave @0x43 demo.
  *
- * I2C: same slave semantics as lab/uno/hello_lab (Pi i2cget @0x43, reg0 magic 0xCE).
+ * I2C slave at 0x43, reg0 = 0xCE (magic). Pi validates via: sudo i2cget -y 1 0x43 0 b
  */
 #include "cede_build_id.h"
 #include <avr/interrupt.h>
@@ -116,9 +116,9 @@ void setup() {
 
   Serial.begin(115200);
   delay(1500);
-  Serial.print(F("CEDE lab_stack ok digest="));
+  Serial.print(F("CEDE i2c_hello ok digest="));
   Serial.print(CEDE_IMAGE_ID);
-  Serial.println(F(" (i2c target 0x43; send m for uno→pico I2C test)"));
+  Serial.println(F(" (i2c 0x43; send m for uno->pico I2C test)"));
 }
 
 void loop() {

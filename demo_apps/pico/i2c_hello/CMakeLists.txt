@@ -8,7 +8,7 @@ endif()
 
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
-project(lab_stack C CXX ASM)
+project(i2c_hello C CXX ASM)
 
 pico_sdk_init()
 
@@ -39,9 +39,9 @@ file(
   "#endif\n"
 )
 
-add_executable(lab_stack src/main.c)
-target_include_directories(lab_stack PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-target_link_libraries(lab_stack pico_stdlib hardware_i2c pico_i2c_slave)
-pico_enable_stdio_usb(lab_stack 1)
+add_executable(i2c_hello src/main.c)
+target_include_directories(i2c_hello PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(i2c_hello pico_stdlib hardware_i2c pico_i2c_slave)
+pico_enable_stdio_usb(i2c_hello 1)
 
-pico_add_extra_outputs(lab_stack)
+pico_add_extra_outputs(i2c_hello)

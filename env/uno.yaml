@@ -20,7 +20,7 @@ targets:
 
 images:
   uno_hex: '../lab/uno/hello_lab/build/hello_lab.ino.hex'
-  uno_hex_lab_stack: '../lab/uno/lab_stack/build/lab_stack.ino.hex'
+  uno_hex_i2c_hello: '../demo_apps/uno/i2c_hello/build/i2c_hello.ino.hex'
 
 tools:
   avrdude: '/usr/bin/avrdude'

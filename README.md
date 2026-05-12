@@ -131,10 +131,8 @@ lab/
     TOOLCHAIN_VERSIONS
   pico/
     hello_lab/              # minimal Pico W firmware (CMake)
-    lab_stack/              # multi-target Pico application
   uno/
     hello_lab/              # minimal Uno sketch (Arduino CLI)
-    lab_stack/              # multi-target Uno application
   pi/
     bootstrap/              # gateway installer + cloud-init helpers + config generators
     cloud-init/             # templates + rendered files for SD card
@@ -142,11 +140,16 @@ lab/
     native/hello_gateway/   # aarch64 native binary for the gateway
     scripts/
     services/               # systemd units (placeholder)
-    ssd1306_dual/           # dual SSD1306 OLED display test
-    ssd1306_eyes/           # SSD1306 "cat eyes" animated display
   sensors/
     catalog.yaml            # post–Hello Lab sensor catalog (placeholder)
   tests/
+demo_apps/
+  pico/
+    i2c_hello/              # I2C slave + serial banner demo (Pico side)
+  uno/
+    i2c_hello/              # I2C slave + serial banner demo (Uno side)
+  pi/
+    ssd1306_eyes/           # OLED animation demo (Pi gateway)
 CONTRIBUTING.md
 DESIGN.md
 Makefile                  # uv sync, test-config-local, lg-test-*, legacy pi-gateway-*
@@ -191,9 +194,9 @@ Copy `lab/config/lab.example.yaml` to `lab/config/lab.yaml` for machine-specific
 
 Interactive shells: `make -C lab/docker shell-pico`, `shell-arduino`, `shell-orch`.
 
-**Uno programming from Dev-Host:** After `uno-build`, run `make pi-gateway-flash-test-uno` (default `GATEWAY=pi@cede-pi.local`). That pushes minimal `lab/pi` helpers (`make pi-gateway-sync`), `scp`s the HEX, runs **`avrdude`** readback verify on the MCU, then `pi_validate_uno_serial.py` for the **`CEDE hello_lab ok`** banner @ 115200. Omit **`PORT=`** when you can—the gateway runs `pi_resolve_gateway_uno.py` (prefers **`/dev/serial/by-id/usb-Arduino*`**, then a lone **`ttyUSB*`**, then a non‑Pico **`ttyACM*`** inferred via **`usb-Raspberry_Pi*`** symlink targets). Uno‑only dependency sync:** `UNO_ONLY=1 make pi-gateway-sync`. Offline regression:** `uv run pytest -q lab/tests/test_uno_gateway_env.py`.
+**MCU programming via LabGrid (preferred):** After `pico-build` / `uno-build`, run **`make lg-test-pico`** or **`make lg-test-uno`**. These use LabGrid's `PicotoolFlashDriver` / `AvrdudeFlashDriver` with `ManagedFile` content-addressed transfer through the exporter — no manual `scp` or sparse tree needed. Run **`make lg-test-all`** for both MCUs + I2C.
 
-**cede-rp2 (Pico C++/SDK) from Dev-Host:** After `pico-build`, run **`make pi-gateway-flash-test-pico`** (same `GATEWAY` defaults). Syncs Pico flash helpers, `scp`s the UF2, runs **`pi_flash_pico_auto.sh`** on the gateway (**`picotool reboot -uf`** when the Pi’s **`picotool`** has USB—**`-f`** covers prior firmware on USB serial, e.g. MicroPython; else use **`PICO_BOOTSEL_ONLY=1`** with the Pico in BOOTSEL). Then **`pi_validate_pico_serial.py`** checks **`CEDE hello_lab rp2 ok`**. Offline:** `uv run pytest -q lab/tests/test_pico_gateway_env.py`.
+**SSH escape hatch:** When the LabGrid coordinator/exporter aren't running, use the legacy `pi-gateway-*` targets: `make pi-gateway-flash-test-uno` / `make pi-gateway-flash-test-pico` (pushes minimal helpers via `pi-gateway-sync`, `scp`s firmware, runs avrdude/picotool on the Pi, validates serial banner). Offline regression: `uv run pytest -q lab/tests/test_uno_gateway_env.py` / `test_pico_gateway_env.py`.
 
 Full runbook: [lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md).
 
@@ -268,7 +271,7 @@ Hello Lab is defined in [DESIGN.md](DESIGN.md) §9. In order: **SSH** from Dev-H
 1. Dev-Host ↔ Pi SSH  
 2. Docker toolchain builds (Pico + Uno)  
 3. RPi programs Pico  
-4. RPi programs Uno — **`make pi-gateway-flash-test-uno`** (**`PORT`** optional); **`pytest lab/tests/test_uno_gateway_env.py`**. **cede-rp2:** **`make pi-gateway-flash-test-pico`**; **`pytest lab/tests/test_pico_gateway_env.py`** — see [lab/pi/docs/pico-uno-subtargets.md](lab/pi/docs/pico-uno-subtargets.md).
+4. RPi programs Uno — **`make lg-test-uno`** (LabGrid) or **`make pi-gateway-flash-test-uno`** (SSH escape hatch). **cede-rp2:** **`make lg-test-pico`** or **`make pi-gateway-flash-test-pico`**.
 5. RPi ↔ Pico serial (round‑trip)  
 6. RPi ↔ Uno serial (round‑trip) — **hello_lab** emits `CEDE hello_lab ok`; validated automatically in step 4’s banner check above.  
 7. I2C matrix: RPi, Pico, Uno (full matrix of enabled sources and endpoints)  

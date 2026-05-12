@@ -81,7 +81,7 @@ This remains the baseline for flashing and serial validators.
 
 From **cede-pi**: `sudo i2cdetect -y 1` should show **`42`** and **`43`** when both targets run current `hello_lab`.
 
-**Optional SSD1306 OLEDs** on the same Pi I2C bus use different addresses (typically **`3c`** and **`3d`** with an ADDR jumper). They do not collide with **`0x42`** / **`0x43`**. See [lab/pi/ssd1306_dual/README.md](../ssd1306_dual/README.md).
+**Optional SSD1306 OLEDs** on the same Pi I2C bus use different addresses (typically **`3c`** and **`3d`** with an ADDR jumper). They do not collide with **`0x42`** / **`0x43`**. See the SSD1306 demo apps under `demo_apps/` for wiring details.
 
 ### I2C matrix tests (Pi → each MCU)
 

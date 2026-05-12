@@ -1,0 +1,11 @@
+# CEDE application manifest — everything cede-labgrid needs to know about this app.
+application_id: i2c_hello
+target: uno
+entrypoint: build/*.hex
+resources:
+  usb_serial:
+    banner_prefix: "CEDE i2c_hello ok"
+  i2c_slave:
+    address: 0x43
+    registers:
+      0: { kind: status, expect_boot_magic: 0xCE }

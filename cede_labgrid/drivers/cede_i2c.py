@@ -49,6 +49,22 @@ class CedeI2CDriver(Driver):
 
     @Driver.check_active
     @step()
+    def bus_speed_hz(self) -> int | None:
+        """Read the I2C bus clock rate from the Pi's device tree config.
+
+        Returns the baudrate in Hz, or None if it cannot be determined.
+        """
+        cmd = "grep -oP 'i2c_arm_baudrate=\\K[0-9]+' /boot/firmware/config.txt"
+        stdout, stderr, rc = self.command.run(cmd, timeout=5)
+        if rc != 0 or not stdout or not stdout[0].strip():
+            return None
+        try:
+            return int(stdout[0].strip())
+        except ValueError:
+            return None
+
+    @Driver.check_active
+    @step()
     def i2cdetect(self) -> str:
         """Run i2cdetect and return the raw output table."""
         cmd = f"sudo i2cdetect -y {self.bus}"

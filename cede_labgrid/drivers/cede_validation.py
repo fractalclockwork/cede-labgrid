@@ -58,12 +58,20 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
 
     Bindings:
         console: ConsoleProtocol (SerialDriver)
+
+    Attributes:
+        role: 'pico' or 'uno' — used to select default banner prefix.
+        image: LabGrid image key for resolving the .digest sidecar.
+        banner_prefix: Optional override. When set, replaces the default
+            BANNER_PREFIXES[role] lookup. This allows any application to
+            provide its own banner string via the env YAML.
     """
 
     bindings = {"console": ConsoleProtocol}
 
     role = attr.ib(validator=attr.validators.in_(("pico", "uno")))
     image = attr.ib(validator=attr.validators.instance_of(str))
+    banner_prefix = attr.ib(default="", validator=attr.validators.instance_of(str))
     banner_timeout = attr.ib(default=8.0, validator=attr.validators.instance_of(float))
     txdelay = attr.ib(default=0.0, validator=attr.validators.instance_of(float))
 
@@ -72,6 +80,12 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
 
     def _write(self, data: bytes) -> int:
         return self.console.write(data)
+
+    def _resolve_banner(self) -> str:
+        """Return the expected banner prefix: explicit override or role-based default."""
+        if self.banner_prefix:
+            return self.banner_prefix
+        return BANNER_PREFIXES[self.role]
 
     @Driver.check_active
     @step()
@@ -83,7 +97,7 @@ class CedeValidationDriver(ConsoleExpectMixin, Driver):
         """
         image_path = self.target.env.config.get_image_path(self.image)
         expected_digest = _read_digest_sidecar(image_path)
-        expected_banner = BANNER_PREFIXES[self.role]
+        expected_banner = self._resolve_banner()
 
         logger.info(
             "Validating %s: banner=%r, expected digest=%s",

@@ -15,10 +15,8 @@
 #   lab/pi/scripts/devhost_pi_gateway.sh validate-uno-serial | validate-pico-serial [--port …] [--digest GITSHORT]
 #   validate-gateway-native [--binary PATH] [--digest TOKEN] — Dev-Host builds aarch64 ELF; scp to /tmp on Pi;
 #        rsync flash deps only (sync_gateway_flash_deps.sh); Pi never needs a git checkout.
-#   ssd1306-dual-run [--no-sync] — rsync includes lab/pi/ssd1306_dual; Pi: venv + pip + run main.py (Ctrl+C)
-#   ssd1306-dual-bus-speed [--no-sync] — sync + install + bus_speed_test.py (SSD1306_SPEED_DURATION on Pi)
-#   ssd1306-eyes-run [--no-sync] — sync + install + ssd1306_eyes/main.py (Ctrl+C)
-#   SSD1306_EYES_EXTRA_ARGS — optional; forwarded to Pi `make ssd1306-eyes-run` (e.g. --contrast-left 220)
+#   Demo apps (ssd1306_frame_test, ssd1306_eyes, etc.) have their own Makefiles — use
+#   make -C demo_apps/<app> deploy GATEWAY=… from the repo root instead.
 
 set -euo pipefail
 
@@ -321,69 +319,6 @@ cmd_validate_gateway_native() {
   remote python3 lab/pi/scripts/pi_validate_gateway_native.py "${extra_args[@]}" "${scp_dest}"
 }
 
-cmd_ssd1306_dual_run() {
-  local do_sync=1
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --no-sync) do_sync=0; shift ;;
-      -h|--help) usage 0 ;;
-      *) echo "unknown arg: $1" >&2; usage 1 ;;
-    esac
-  done
-  if [[ "${SKIP_SYNC:-}" == "1" ]]; then
-    do_sync=0
-  fi
-  if [[ "${do_sync}" -eq 1 ]]; then
-    sync_deps
-  fi
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-dual-install (venv + pip) …" >&2
-  remote make -C lab/pi ssd1306-dual-install
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-dual-run (Ctrl+C stops) …" >&2
-  remote make -C lab/pi ssd1306-dual-run
-}
-
-cmd_ssd1306_dual_bus_speed() {
-  local do_sync=1
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --no-sync) do_sync=0; shift ;;
-      -h|--help) usage 0 ;;
-      *) echo "unknown arg: $1" >&2; usage 1 ;;
-    esac
-  done
-  if [[ "${SKIP_SYNC:-}" == "1" ]]; then
-    do_sync=0
-  fi
-  if [[ "${do_sync}" -eq 1 ]]; then
-    sync_deps
-  fi
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-dual-install …" >&2
-  remote make -C lab/pi ssd1306-dual-install
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-dual-bus-speed (SSD1306_SPEED_DURATION=${SSD1306_SPEED_DURATION:-10}s) …" >&2
-  remote env SSD1306_SPEED_DURATION="${SSD1306_SPEED_DURATION:-10}" make -C lab/pi ssd1306-dual-bus-speed
-}
-
-cmd_ssd1306_eyes_run() {
-  local do_sync=1
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --no-sync) do_sync=0; shift ;;
-      -h|--help) usage 0 ;;
-      *) echo "unknown arg: $1" >&2; usage 1 ;;
-    esac
-  done
-  if [[ "${SKIP_SYNC:-}" == "1" ]]; then
-    do_sync=0
-  fi
-  if [[ "${do_sync}" -eq 1 ]]; then
-    sync_deps
-  fi
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-eyes-install …" >&2
-  remote make -C lab/pi ssd1306-eyes-install
-  echo "==> ${GATEWAY}: make -C lab/pi ssd1306-eyes-run (SSD1306_EYES_EXTRA_ARGS='${SSD1306_EYES_EXTRA_ARGS:-}') (Ctrl+C stops) …" >&2
-  remote env SSD1306_EYES_EXTRA_ARGS="${SSD1306_EYES_EXTRA_ARGS:-}" make -C lab/pi ssd1306-eyes-run
-}
-
 case "${1:-}" in
   "")
     usage 1
@@ -428,18 +363,6 @@ case "${1:-}" in
   validate-gateway-native)
     shift
     cmd_validate_gateway_native "$@"
-    ;;
-  ssd1306-dual-run)
-    shift
-    cmd_ssd1306_dual_run "$@"
-    ;;
-  ssd1306-dual-bus-speed)
-    shift
-    cmd_ssd1306_dual_bus_speed "$@"
-    ;;
-  ssd1306-eyes-run)
-    shift
-    cmd_ssd1306_eyes_run "$@"
     ;;
   *)
     echo "unknown command: $1" >&2

@@ -38,38 +38,26 @@ paths:
   uno_hex_glob: "lab/uno/hello_lab/build/*.hex"
   logs_dir: "lab/pi/logs"
   test_results_dir: "lab/tests/results"
-  lab_stack_pico_build: "lab/pico/lab_stack/build"
-  lab_stack_pico_uf2_glob: "lab/pico/lab_stack/build/*.uf2"
-  lab_stack_uno_build: "lab/uno/lab_stack/build"
-  lab_stack_uno_hex_glob: "lab/uno/lab_stack/build/*.hex"
-  ssd1306_dual_pi_app: "lab/pi/ssd1306_dual"
-  ssd1306_dual_pi_main_glob: "lab/pi/ssd1306_dual/main.py"
-  ssd1306_eyes_pi_app: "lab/pi/ssd1306_eyes"
-  ssd1306_eyes_pi_main_glob: "lab/pi/ssd1306_eyes/main.py"
+  i2c_hello_pico_build: "demo_apps/pico/i2c_hello/build"
+  i2c_hello_pico_uf2_glob: "demo_apps/pico/i2c_hello/build/*.uf2"
+  i2c_hello_uno_build: "demo_apps/uno/i2c_hello/build"
+  i2c_hello_uno_hex_glob: "demo_apps/uno/i2c_hello/build/*.hex"
+  # Demo app paths are not registered here — each app is self-describing
+  # via its own cede_app.yaml (see demo_apps/*/cede_app.yaml).
 
-# Multi-target application: join key lab_stack — path keys must exist under paths.* above.
+# Multi-target demo application: join key i2c_hello — path keys must exist under paths.* above.
 applications:
-  lab_stack:
+  i2c_hello:
     targets:
       pico:
-        paths_build_key: lab_stack_pico_build
-        paths_artifact_glob_key: lab_stack_pico_uf2_glob
+        paths_build_key: i2c_hello_pico_build
+        paths_artifact_glob_key: i2c_hello_pico_uf2_glob
       uno:
-        paths_build_key: lab_stack_uno_build
-        paths_artifact_glob_key: lab_stack_uno_hex_glob
+        paths_build_key: i2c_hello_uno_build
+        paths_artifact_glob_key: i2c_hello_uno_hex_glob
 
-  # Pi-only: dual SSD1306 OLED demo (Python on gateway — see lab/pi/ssd1306_dual/README.md).
-  ssd1306_dual:
-    targets:
-      pi:
-        paths_build_key: ssd1306_dual_pi_app
-        paths_artifact_glob_key: ssd1306_dual_pi_main_glob
-
-  ssd1306_eyes:
-    targets:
-      pi:
-        paths_build_key: ssd1306_eyes_pi_app
-        paths_artifact_glob_key: ssd1306_eyes_pi_main_glob
+  # Demo apps (ssd1306_frame_test, ssd1306_eyes, etc.) are self-describing —
+  # see demo_apps/*/cede_app.yaml. They are not registered here.
 
 # Optional target metadata (keys reference existing paths.* and serial.devices.* property names).
 targets:

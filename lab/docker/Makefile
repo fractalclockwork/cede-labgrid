@@ -192,7 +192,7 @@ smoke: build-images
 	$(COMPOSE) run --rm orchestration-dev bash -lc 'python -c "import serial, yaml, jsonschema; import pytest" && cc --version | head -n 1'
 
 # Plain Pico by default; Pico W: make pico-build PICO_BOARD=pico_w.
-# PICO_APP / UNO_APP — sketch/project directory under lab/pico / lab/uno (default hello_lab). Example: make pico-build PICO_APP=lab_stack
+# PICO_APP / UNO_APP — sketch/project directory under lab/pico / lab/uno (default hello_lab).
 # Optional: CEDE_IMAGE_ID=abc1234 — embed in USB banner digest= (default: git rev-parse --short=12 in repo).
 PICO_BOARD ?= pico
 PICO_APP ?= hello_lab
@@ -218,13 +218,32 @@ uno-build:
 		grep -oP "(?<=CEDE_IMAGE_ID \")([A-Za-z0-9._-]+)" cede_build_id.h > build/$(UNO_APP).ino.hex.digest \
 	'
 
-# Convenience: second reference application (see lab/docs/applications.md).
-.PHONY: pico-build-lab-stack uno-build-lab-stack
-pico-build-lab-stack:
-	@$(MAKE) pico-build PICO_APP=lab_stack
+# Convenience: i2c_hello demo app lives under demo_apps/ (see docs/APP_DEVELOPMENT.md).
+.PHONY: pico-build-i2c-hello uno-build-i2c-hello pico-build-lab-stack uno-build-lab-stack
+PICO_I2C_HELLO_APP ?= i2c_hello
+pico-build-i2c-hello:
+	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) pico-dev bash -lc '\
+		set -e; \
+		cd /workspace/demo_apps/pico/$(PICO_I2C_HELLO_APP) && \
+		rm -rf build && mkdir build && cd build && \
+		cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DPICO_BOARD=$(PICO_BOARD) .. && \
+		ninja && \
+		grep -oP "(?<=CEDE_IMAGE_ID \")([A-Za-z0-9._-]+)" cede_build_id.h > $(PICO_I2C_HELLO_APP).uf2.digest \
+	'
 
-uno-build-lab-stack:
-	@$(MAKE) uno-build UNO_APP=lab_stack
+uno-build-i2c-hello:
+	$(COMPOSE) run --rm $(if $(strip $(CEDE_IMAGE_ID)),-e CEDE_IMAGE_ID="$(CEDE_IMAGE_ID)",) arduino-dev bash -lc '\
+		set -e; \
+		cd /workspace/demo_apps/uno/$(PICO_I2C_HELLO_APP) && \
+		bash tools/gen_cede_image_id.sh && \
+		mkdir -p build && \
+		arduino-cli compile --fqbn arduino:avr:uno --output-dir build . && \
+		grep -oP "(?<=CEDE_IMAGE_ID \")([A-Za-z0-9._-]+)" cede_build_id.h > build/$(PICO_I2C_HELLO_APP).ino.hex.digest \
+	'
+
+# Legacy aliases
+pico-build-lab-stack: pico-build-i2c-hello
+uno-build-lab-stack: uno-build-i2c-hello
 
 # aarch64 ELF for Raspberry Pi OS 64-bit gateway (linux/arm64 OCI; qemu/binfmt on amd64 hosts).
 CEDE_IMAGE_ID ?=

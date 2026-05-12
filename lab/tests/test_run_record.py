@@ -32,7 +32,7 @@ def test_cede_emit_run_record_writes_json(repo_root: Path, tmp_path: Path) -> No
             "--gateway",
             "pi@cede-pi.local",
             "--application-id",
-            "lab_stack",
+            "i2c_hello",
             "--transport-path",
             "usb_serial",
             "--exit-status",
@@ -55,7 +55,7 @@ def test_cede_emit_run_record_writes_json(repo_root: Path, tmp_path: Path) -> No
     assert data["gateway"] == "pi@cede-pi.local"
     assert data["exit_status"] == 0
     assert "utc_timestamp" in data
-    assert data["application_id"] == "lab_stack"
+    assert data["application_id"] == "i2c_hello"
     assert data["transport_path"] == "usb_serial"
 
 
